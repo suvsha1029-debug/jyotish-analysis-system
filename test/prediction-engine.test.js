@@ -32,8 +32,10 @@ describe("Vimshottari timeline", () => {
     expect(report.currentPeriod.theme.headline).toBeTruthy();
     expect(report.currentPeriod.theme.domains).toHaveLength(3);
     expect(report.currentPeriod.theme.d60).toHaveLength(2);
-    expect(report.foreignAnalysis.houses.map((item)=>item.house)).toEqual([4,9,12]);
-    expect(report.foreignAnalysis.primary.houses.map((item)=>item.house)).toEqual([9,12]);
+    expect(report.foreignAnalysis.houses.map((item)=>item.house)).toEqual([1,3,4,7,9,12]);
+    expect(report.foreignAnalysis.primary.houses.map((item)=>item.house)).toEqual([3,7,9,12]);
+    expect(report.foreignAnalysis.lordConnections.map((item)=>item.label)).toEqual(expect.arrayContaining(["1L–9L","1L–12L","4L–9L","4L–12L","9L–12L","7L–12L"]));
+    expect(report.foreignAnalysis.houses.every((item)=>item.dignity&&item.dispositor)).toBe(true);
     expect(report.foreignAnalysis.supporting.map((item)=>item.code)).toEqual(["D10","D9"]);
     expect(report.foreignAnalysis.functional.every((item)=>["FB","FM","Mixed","Node"].includes(item.code))).toBe(true);
     expect(report.timeline.periods.some((period) => period.theme.phase === "past")).toBe(true);

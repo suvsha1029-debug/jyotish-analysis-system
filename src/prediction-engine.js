@@ -261,7 +261,7 @@ export function evaluateDomain(result, key) {
 
 function buildForeignAnalysis(result,structural,current) {
   const d1=result.charts.D1,d4=result.charts.D4,d9=result.charts.D9,d10=result.charts.D10;
-  const focusHouses=[4,9,12], d4Houses=[9,12];
+  const focusHouses=[1,3,4,7,9,12], d4Houses=[3,7,9,12];
   const lords=Object.fromEntries(focusHouses.map((house)=>[house,houseLord(d1,house)]));
   const lagnaLord=houseLord(d1,1), lagnaLordHouse=bodyHouse(d1,lagnaLord);
   const aspectLinks=structural.aspects.filter((aspect)=>aspect.body===lagnaLord&&focusHouses.includes(aspect.toHouse));
@@ -270,16 +270,32 @@ function buildForeignAnalysis(result,structural,current) {
     return house===lagnaLordHouse||structural.aspects.some((aspect)=>(aspect.body===lord&&aspect.toHouse===lagnaLordHouse)||(aspect.body===lagnaLord&&aspect.toHouse===house));
   });
   const rahuHouse=bodyHouse(d1,"Rahu"), rahuAspects=structural.aspects.filter((aspect)=>aspect.body==="Rahu"&&focusHouses.includes(aspect.toHouse)).map((aspect)=>aspect.toHouse);
-  const houseLayer=focusHouses.map((house)=>({house,lord:lords[house],lordHouse:bodyHouse(d1,lords[house]),occupants:rowByHouse(d1,house).bodies,sav:structural.ashtakavarga.sav[rowByHouse(d1,house).sign]}));
+  const connected=(a,b)=>{
+    const pa=bodyHouse(d1,a),pb=bodyHouse(d1,b);
+    return a===b||pa===pb||structural.aspects.some((aspect)=>(aspect.body===a&&aspect.toHouse===pb)||(aspect.body===b&&aspect.toHouse===pa));
+  };
+  const houseLayer=focusHouses.map((house)=>{
+    const lord=lords[house],planet=structural.planets[lord];
+    return {house,lord,lordHouse:bodyHouse(d1,lord),occupants:rowByHouse(d1,house).bodies,sav:structural.ashtakavarga.sav[rowByHouse(d1,house).sign],dignity:planet?.dignity,functional:planet?.functional?.code||"—",dispositor:planet?.dispositor};
+  });
+  const lordConnections=[
+    {label:"1L–9L",a:lagnaLord,b:lords[9],meaning:"The native and long-distance fortune/dharma"},
+    {label:"1L–12L",a:lagnaLord,b:lords[12],meaning:"The native and residence away/separation"},
+    {label:"4L–9L",a:lords[4],b:lords[9],meaning:"Home base and long-distance movement"},
+    {label:"4L–12L",a:lords[4],b:lords[12],meaning:"Home base and life away from birthplace"},
+    {label:"9L–12L",a:lords[9],b:lords[12],meaning:"Long-distance movement and foreign residence"},
+    {label:"7L–12L",a:lords[7],b:lords[12],meaning:"Distant environments/contracts and foreign residence"},
+  ].map((item)=>({...item,linked:connected(item.a,item.b),aHouse:bodyHouse(d1,item.a),bHouse:bodyHouse(d1,item.b)}));
   const chartLayer=(chart,code,houses)=>({code,houses:houses.map((house)=>({house,occupants:rowByHouse(chart,house).bodies})),activations:houses.reduce((sum,house)=>sum+rowByHouse(chart,house).bodies.length,0)});
   const d4Layer=chartLayer(d4,"D4",d4Houses),d10Layer=chartLayer(d10,"D10",[9,12]),d9Layer=chartLayer(d9,"D9",[9,12]);
-  const movementPoints=(rowByHouse(d1,9).bodies.length?1:0)+(rowByHouse(d1,12).bodies.length?1:0)+d4Layer.activations+(rahuAspects.length||[9,12].includes(rahuHouse)?1:0);
-  const basePoints=(rowByHouse(d1,4).bodies.length?1:0)+(rowByHouse(d1,12).bodies.length?1:0)+rowByHouse(d4,12).bodies.length+(lordLinks.length?1:0);
+  const movementPoints=(rowByHouse(d1,9).bodies.length?1:0)+(rowByHouse(d1,12).bodies.length?1:0)+lordConnections.filter((item)=>item.linked).length+d4Layer.activations+(rahuAspects.length||[9,12].includes(rahuHouse)?1:0);
+  const basePoints=(rowByHouse(d1,4).bodies.length?1:0)+(rowByHouse(d1,12).bodies.length?1:0)+rowByHouse(d4,12).bodies.length+(lordConnections.some((item)=>["1L–12L","4L–12L","9L–12L"].includes(item.label)&&item.linked)?1:0);
   const level=(points)=>points>=4?"Good":points>=2?"Moderate":"Low";
   const axis=current?.geometry||null;
   const axisResult=!axis?"No active MD-AD axis":axis.pair==="6/8"?"High adjustment and friction; results require saving factors.":axis.pair==="4/10"?"Strong relocation-versus-duty axis; concrete restructuring is possible.":axis.pair==="3/11"?"Effort can convert into networks and gains.":axis.pair==="5/9"?"Supportive trinal coordination.":axis.pair==="2/12"?"Movement, expenditure and transition are emphasized.":axis.relation;
   return {
     houses:houseLayer,
+    lordConnections,
     primary:d4Layer,
     supporting:[d10Layer,d9Layer],
     movement:{label:"Foreign movement indication",level:level(movementPoints),detail:"Long-distance movement from D1 9H/12H, D4 9H/12H and Rahu links."},
