@@ -89,4 +89,16 @@ describe("Vimshottari timeline", () => {
     expect(report.foreignSpouseAnalysis.method).toContain("D9 7th");
     expect(["Good","Moderate","Low"]).toContain(report.foreignSpouseAnalysis.level);
   });
+  it("ranks all Mahadashas with contextual combustion and cross-Varga evidence",()=>{
+    const report=buildPredictionReport(result,new Date("2026-08-08T00:00:00Z"));
+    expect(report.mahadashaRankings).toHaveLength(9);
+    expect(report.mahadashaRankings.map((item)=>item.lord).sort()).toEqual([...new Set(["Ketu","Venus","Sun","Moon","Mars","Rahu","Jupiter","Saturn","Mercury"])].sort());
+    const mars=report.mahadashaRankings.find((item)=>item.lord==="Mars");
+    expect(mars.retrograde).toBe(true);
+    expect(mars).toHaveProperty("d9House");
+    expect(mars).toHaveProperty("d10House");
+    const venus=report.mahadashaRankings.find((item)=>item.lord==="Venus");
+    expect(venus.combustion.statement).toContain(venus.combustion.combust?"modifier":"Outside");
+    expect(report.mahadashaRankings.every((item)=>item.d60?.name&&item.themes.length===3)).toBe(true);
+  });
 });

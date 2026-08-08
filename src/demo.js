@@ -251,6 +251,13 @@ function renderTimelineThemes() {
   document.querySelectorAll(".timeline-filters button").forEach((button)=>button.addEventListener("click",()=>{timelineView=button.dataset.view;renderTimelineThemes();}));
 }
 
+function renderBestPeriods(){
+  selectedInsight="best-periods";
+  setActiveInsightTab("best-periods");
+  const rows=currentPrediction.mahadashaRankings.map((item,index)=>`<details class="timeline-period ${item.window?.current?"current":""}" ${index<3||item.window?.current?"open":""}><summary><span><strong>${index+1}. ${item.lord} Mahadasha</strong><small>${item.window?`${item.window.start} → ${item.window.end}`:"Outside displayed timeline"}</small></span><span><b>${item.themes.map((x)=>x.label).join(" · ")}</b><small>D1 H${item.house} · D9 H${item.d9House} · D10 H${item.d10House}</small></span><em class="period-level ${item.level.toLowerCase()}">${item.level}</em></summary><div class="period-analysis"><p><b>Integrated condition:</b> ${item.functional.label}; ${item.dignity}; ${item.retrograde?"retrograde":"direct"}; ${item.upachaya?"in an upachaya":"not in an upachaya"}. Natural role: ${item.naturalNature}.</p><div class="period-domains"><span><b>D1 ownership</b>${item.housesOwned.map((h)=>`H${h}`).join(", ")||"None"}</span><span><b>Connections received</b>${item.received.join(", ")||"None configured"}</span><span><b>Conjunctions</b>${item.conjunctions.join(", ")||"None"}</span><span><b>Dispositor</b>${item.dispositor} · ${item.dispositorStrong?"supportive condition":"requires caution"}</span></div><div class="theme-card"><span>Combustion context</span><h4>${item.combustion.combust?`Within ${item.combustion.distance}° of Sun`:item.combustion.statement}</h4><p>${item.combustion.statement}</p><small>Mitigation: ${item.combustion.mitigations.join(", ")||"none required/configured"}. Combustion is never scored alone.</small></div><div class="period-amshas"><span><b>D60</b>${item.d60.name} · ${item.d60.nature}</span>${item.themes.map((x)=>`<span><b>${x.label}</b>${x.varga} theme · ${x.points} activation points</span>`).join("")}</div></div></details>`).join("");
+  byId("insight-content").innerHTML=`<div class="insight-head"><div><h3>Best Mahadasha periods</h3><p>Comparative MD delivery potential—not a guarantee that every event in a high-ranked period is favorable.</p></div><span class="varga-badge">Integrated ranking</span></div><p class="limitations">Ranking order: D1 functional lordship, ownership, house placement, dignity, conjunctions, aspects and dispositor first; D9/D10 theme repetition and D60 amsha confirm. Retrogression and combustion modify delivery contextually. Antardasha, transit and the promised domain still decide the actual event.</p><div class="timeline-list">${rows}</div>`;
+}
+
 function renderReadingGuide() {
   selectedInsight = "guide";
   document.querySelectorAll(".insight-tab").forEach((tab) => tab.setAttribute("aria-selected", String(tab.dataset.insight === "guide")));
@@ -260,9 +267,9 @@ function renderReadingGuide() {
 function renderPredictionWorkspace(result) {
   currentPrediction = result.prediction;
   const tabs = byId("insight-tabs"); tabs.replaceChildren();
-  [...Object.entries(DOMAIN_SPECS).map(([key, spec]) => ({ key, label: spec.label })), {key:"promises",label:"Overall promises"},{key:"confirmation",label:"Confirmation"},{key:"ashtakavarga",label:"Ashtakavarga"},{key:"structure",label:"Lords & yogas"},{key:"nodes",label:"Rahu-Ketu"}, { key: "timeline", label: "Timeline" }, { key: "guide", label: "How to read" }].forEach(({ key, label }) => {
+  [...Object.entries(DOMAIN_SPECS).map(([key, spec]) => ({ key, label: spec.label })), {key:"promises",label:"Overall promises"},{key:"confirmation",label:"Confirmation"},{key:"ashtakavarga",label:"Ashtakavarga"},{key:"structure",label:"Lords & yogas"},{key:"nodes",label:"Rahu-Ketu"},{key:"best-periods",label:"Best Mahadashas"}, { key: "timeline", label: "Timeline" }, { key: "guide", label: "How to read" }].forEach(({ key, label }) => {
     const tab = document.createElement("button"); tab.type = "button"; tab.role = "tab"; tab.className = "insight-tab"; tab.dataset.insight = key; tab.textContent = label; tab.setAttribute("aria-selected", String(key === selectedInsight));
-    tab.addEventListener("click", () => key === "timeline" ? renderTimelineThemes() : key === "guide" ? renderReadingGuide() : key === "promises" ? renderOverallPromises() : key === "confirmation" ? renderConfirmation() : key === "ashtakavarga" ? renderAshtakavarga() : key === "structure" ? renderStructure() : key === "nodes" ? renderNodes() : renderDomainInsight(key));
+    tab.addEventListener("click", () => key === "timeline" ? renderTimelineThemes() : key === "best-periods" ? renderBestPeriods() : key === "guide" ? renderReadingGuide() : key === "promises" ? renderOverallPromises() : key === "confirmation" ? renderConfirmation() : key === "ashtakavarga" ? renderAshtakavarga() : key === "structure" ? renderStructure() : key === "nodes" ? renderNodes() : renderDomainInsight(key));
     tabs.append(tab);
   });
   renderDomainInsight(DOMAIN_SPECS[selectedInsight] ? selectedInsight : "overview");

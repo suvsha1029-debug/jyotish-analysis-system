@@ -203,6 +203,33 @@ function periodTheme(result, structural, period, asOf) {
   };
 }
 
+const COMBUSTION_ORBS=Object.freeze({Mars:17,Mercury:14,Jupiter:11,Venus:10,Saturn:15});
+const NATURAL_NATURE=Object.freeze({Sun:"Natural malefic / authority karaka",Moon:"Natural benefic when bright; mind/public karaka",Mars:"Natural malefic / action karaka",Mercury:"Adaptive natural benefic; changes by association",Jupiter:"Natural benefic / wisdom and expansion karaka",Venus:"Natural benefic / relationship and comfort karaka",Saturn:"Natural malefic / endurance and work karaka",Rahu:"Node; amplifies its controllers and associations",Ketu:"Node; separates, specializes and follows its controllers"});
+function angleDistance(a,b){const d=Math.abs(a-b)%360;return Math.min(d,360-d);}
+function buildMahadashaRankings(result,structural,timeline){
+  const d1=result.charts.D1,d9=result.charts.D9,d10=result.charts.D10;
+  const windows=Object.fromEntries(DASHA_LORDS.map((lord)=>{
+    const rows=timeline.periods.filter((item)=>item.mdLord===lord);
+    return [lord,rows.length?{start:rows[0].start,end:rows.at(-1).end,current:rows.some((item)=>item.current)}:null];
+  }));
+  return DASHA_LORDS.map((lord)=>{
+    const p=structural.planets[lord],house=p.house,upachaya=[3,6,10,11].includes(house),kendra=[1,4,7,10].includes(house),trikona=[1,5,9].includes(house);
+    const received=structural.aspects.filter((a)=>a.toHouse===house&&a.body!==lord).map((a)=>a.body);
+    const conjunctions=rowByHouse(d1,house).bodies.filter((body)=>body!==lord&&body!=="Asc");
+    const orb=COMBUSTION_ORBS[lord],solarDistance=orb?angleDistance(result.positions[lord].longitude,result.positions.Sun.longitude):null;
+    const combust=Boolean(orb&&solarDistance<=orb),sunStrong=["Own sign","Exalted"].includes(structural.planets.Sun.dignity)||[1,5,9,10,11].includes(structural.planets.Sun.house);
+    const dispositor=p.dispositor.controller,dispositorStrong=structural.planets[dispositor]&&(["Own sign","Exalted"].includes(structural.planets[dispositor].dignity)||[1,4,5,7,9,10,11].includes(structural.planets[dispositor].house));
+    const saturnSupport=combust&&received.includes("Saturn")&&(["FB","Mixed"].includes(structural.planets.Saturn.functional.code)||[3,6,10,11].includes(structural.planets.Saturn.house));
+    const mitigations=[kendra||trikona?"angular/trinal placement":null,sunStrong?"supportive Sun condition":null,dispositorStrong?"supportive dispositor":null,saturnSupport?"constructive Saturn aspect":null].filter(Boolean);
+    const d9House=bodyHouse(d9,lord),d10House=bodyHouse(d10,lord),d60=shashtiamsaAmsha(result.positions[lord].longitude);
+    let score=45+(p.functional.code==="FB"?15:p.functional.code==="FM"?-10:0)+(["Own sign","Exalted"].includes(p.dignity)?12:p.dignity==="Debilitated"?-12:0)+(kendra?7:0)+(trikona?8:0)+(upachaya?5:0)+(received.includes("Jupiter")?5:0)+(p.debilitation.cancelled?7:0)+([1,4,5,7,9,10,11].includes(d9House)?4:0)+([1,6,9,10,11].includes(d10House)?5:0)+(d60.nature==="Benefic"?5:d60.nature==="Malefic"?-5:0)+(result.positions[lord].retrograde?0:0);
+    if(combust) score-=Math.max(2,10-mitigations.length*2);
+    score=Math.round(clamp(score,15,95));
+    const themes=Object.values(DOMAIN_SPECS).map((spec)=>({label:spec.label,varga:spec.varga,points:(spec.houses.includes(house)?2:0)+p.housesOwned.filter((h)=>spec.houses.includes(h)).length+((spec.vargaHouses||spec.houses).includes(bodyHouse(result.charts[spec.varga]||d1,lord))?1:0)+(spec.karakas?.includes(lord)?1:0)})).sort((a,b)=>b.points-a.points).slice(0,3);
+    return {lord,score,level:score>=68?"Good":score>=45?"Moderate":"Low",window:windows[lord],house,sign:p.sign,housesOwned:p.housesOwned,functional:p.functional,dignity:p.dignity,debilitation:p.debilitation,retrograde:Boolean(result.positions[lord].retrograde),upachaya,kendra,trikona,received,conjunctions,dispositor,dispositorStrong,combustion:{applicable:Boolean(orb),combust,distance:solarDistance===null?null:Number(solarDistance.toFixed(2)),orb,mitigations,statement:!orb?"Combustion is not applied to this body.":!combust?`Outside the configured ${orb}° combustion orb.`:`Combustion is a delivery modifier with ${mitigations.length} mitigating context(s); it is not treated as destruction.`},d9House,d10House,d60,themes,naturalNature:NATURAL_NATURE[lord]};
+  }).sort((a,b)=>b.score-a.score);
+}
+
 export function evaluateDomain(result, key) {
   const spec = DOMAIN_SPECS[key];
   if (!spec) throw new RangeError(`Unknown prediction domain: ${key}`);
@@ -388,6 +415,7 @@ export function buildPredictionReport(result, asOf = new Date()) {
   const foreignAnalysis=buildForeignAnalysis(result,structural,current);
   const foreignSpouseAnalysis=buildForeignSpouseAnalysis(result,structural,current);
   const overallPromises=buildOverallPromises(result,structural,domains);
+  const mahadashaRankings=buildMahadashaRankings(result,structural,timeline);
   return {
     generatedFor: isoDay(asOf),
     domains,
@@ -397,6 +425,7 @@ export function buildPredictionReport(result, asOf = new Date()) {
     foreignAnalysis,
     foreignSpouseAnalysis,
     overallPromises,
+    mahadashaRankings,
     readingOrder: [
       "Start with D1 structural promise and functional house lords.",
       "Open the relevant domain Varga; repetition is stronger than one isolated indication.",
