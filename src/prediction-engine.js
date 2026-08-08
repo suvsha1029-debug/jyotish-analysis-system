@@ -33,6 +33,7 @@ export const CONFIRMATION_WEIGHTS = Object.freeze({
 
 function rowByHouse(chart, house) { return chart.rows.find((row) => row.house === house); }
 function bodyHouse(chart, bodyName) { return chart.rows.find((row) => row.bodyDetails.some((body) => body.name === bodyName))?.house; }
+function bodySign(chart, bodyName) { return chart.rows.find((row) => row.bodyDetails.some((body) => body.name === bodyName))?.sign; }
 function houseLord(chart, house) { return PLANET_RULERS[rowByHouse(chart, house).sign]; }
 function qualitative(value) { return value >= 4 ? "High" : value >= 2 ? "Moderate" : value >= 1 ? "Mixed" : "Low"; }
 function addYears(date, years) { return new Date(date.getTime() + years * YEAR_MS); }
@@ -42,6 +43,27 @@ function confirmationLabel(score) {
   if (score >= 68) return "Good";
   if (score >= 45) return "Moderate";
   return "Low";
+}
+
+function evaluateHoraWealth(result, structural) {
+  const d1=result.charts.D1,d2=result.charts.D2;
+  const preferred={Sun:"Leo",Mars:"Leo",Jupiter:"Leo",Moon:"Cancer",Venus:"Cancer",Saturn:"Cancer"};
+  const classical=["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn"];
+  const planets=classical.map((planet)=>{
+    const sign=bodySign(d2,planet);
+    const suitable=planet==="Mercury"||preferred[planet]===sign;
+    return {planet,sign,hora:sign==="Leo"?"Sun's Hora":"Moon's Hora",suitable,rule:planet==="Mercury"?"Effective in either Hora":`${planet} is more expressive in ${preferred[planet]==="Leo"?"Sun's":"Moon's"} Hora`};
+  });
+  const secondLord=houseLord(d1,2),eleventhLord=houseLord(d1,11),sameLord=secondLord===eleventhLord;
+  const secondHouse=bodyHouse(d1,secondLord),eleventhHouse=bodyHouse(d1,eleventhLord);
+  const linked=sameLord||secondHouse===eleventhHouse||structural.aspects.some((aspect)=>(aspect.body===secondLord&&aspect.toHouse===eleventhHouse)||(aspect.body===eleventhLord&&aspect.toHouse===secondHouse));
+  const carriers=[...new Set([secondLord,eleventhLord])].map((planet)=>({planet,d1House:bodyHouse(d1,planet),d1Sign:bodySign(d1,planet),dignity:structural.planets[planet].dignity,d2Sign:bodySign(d2,planet),horaSuitable:planets.find((item)=>item.planet===planet)?.suitable}));
+  const d2LagnaLord=PLANET_RULERS[d2.ascSign],d2LagnaLordHouse=bodyHouse(d2,d2LagnaLord);
+  const suitableCount=planets.filter((item)=>item.suitable).length;
+  const carrierSupport=carriers.filter((item)=>item.horaSuitable).length;
+  const score=Math.round(clamp(30+(suitableCount/classical.length)*40+(sameLord?10:linked?7:0)+(carrierSupport/carriers.length)*10+([1,4,5,7,9,10,11].includes(d2LagnaLordHouse)?8:0),20,95));
+  return {score,label:confirmationLabel(score),d2Lagna:d2.ascSign,d2LagnaLord,d2LagnaLordHouse,planets,suitableCount,secondLord,eleventhLord,sameLord,linked,carriers,
+    detail:`Hora suitability supports ${suitableCount} of ${classical.length} classical planets. D1 H2 lord ${secondLord} and H11 lord ${eleventhLord} are ${sameLord?"the same wealth-and-gains controller":linked?"structurally linked":"not directly linked"}; ${carrierSupport} of ${carriers.length} unique carrier(s) are effective in their D2 Hora.`};
 }
 
 function buildConfirmation(result, domain, structural, current, savAverage) {
@@ -56,7 +78,8 @@ function buildConfirmation(result, domain, structural, current, savAverage) {
   const vargaHouses=domain.vargaHouses||domain.houses;
   const vargaChecks = vargaHouses.map((house) => rowByHouse(varga, house)?.bodies.length > 0);
   const d1Score = Math.round(25 + 75 * d1Checks.filter(Boolean).length / d1Checks.length);
-  const vargaScore = Math.round(20 + 80 * vargaChecks.filter(Boolean).length / vargaChecks.length);
+  const hora=domain.key==="money"?evaluateHoraWealth(result,structural):null;
+  const vargaScore = hora?.score??Math.round(20 + 80 * vargaChecks.filter(Boolean).length / vargaChecks.length);
   const avScore = Math.round(clamp(50 + (savAverage - structural.ashtakavarga.average) * 7, 20, 90));
   const relevantYogaTypes = ["money", "gains"].includes(domain.key) ? ["wealth"] : ["career", "fame", "overview"].includes(domain.key) ? ["status", "wealth"] : [];
   const yogaCount = structural.yogas.filter((yoga) => relevantYogaTypes.includes(yoga.type)).length;
@@ -73,13 +96,13 @@ function buildConfirmation(result, domain, structural, current, savAverage) {
   const timingScore = current ? Math.round(clamp(25 + activationCount * 15, 20, 95)) : 25;
   const components = [
     { key:"d1", label:"D1 structural promise", chart:"D1", weight:CONFIRMATION_WEIGHTS.d1, score:d1Score, detail:`${d1Checks.filter(Boolean).length} of ${d1Checks.length} configured house/lord checks support the topic.` },
-    { key:"varga", label:`${domain.varga} divisional confirmation`, chart:domain.varga, weight:CONFIRMATION_WEIGHTS.varga, score:vargaScore, detail:`${vargaChecks.filter(Boolean).length} of ${vargaChecks.length} topic houses are occupied in the relevant Varga.` },
+    { key:"varga", label:`${domain.varga} divisional confirmation`, chart:domain.varga, weight:CONFIRMATION_WEIGHTS.varga, score:vargaScore, detail:hora?.detail??`${vargaChecks.filter(Boolean).length} of ${vargaChecks.length} topic houses are occupied in the relevant Varga.` },
     { key:"ashtakavarga", label:"Ashtakavarga support", chart:"SAV", weight:CONFIRMATION_WEIGHTS.ashtakavarga, score:avScore, detail:`Topic-house SAV ${savAverage.toFixed(1)} versus chart average ${structural.ashtakavarga.average.toFixed(1)}.` },
     { key:"structure", label:"Lords, dignity & yogas", chart:"Structure", weight:CONFIRMATION_WEIGHTS.structure, score:structureScore, detail:`${conditionedLords} conditioned topic lords and ${yogaCount} relevant configured yogas.` },
     { key:"timing", label:"Current MD-AD activation", chart:"Timing", weight:CONFIRMATION_WEIGHTS.timing, score:timingScore, detail:current ? `${current.mdLord}-${current.adLord} produces ${activationCount} topic-house activations across ${domain.varga === "D1" ? "D1 placements and natal ownership" : `D1, ${domain.varga} and natal ownership`}.` : "No current MD-AD period was available." },
   ];
   const score = Math.round(components.reduce((sum, item) => sum + item.score * item.weight, 0) / 100);
-  return { score, label:confirmationLabel(score), components, methodNote:"D1 governs promise. The relevant Varga and Ashtakavarga confirm it; MD-AD determines whether the promise is presently activated across D1 and the relevant division." };
+  return { score, label:confirmationLabel(score), components, hora, methodNote:"D1 governs promise. The relevant Varga and Ashtakavarga confirm it; MD-AD determines whether the promise is presently activated across D1 and the relevant division." };
 }
 
 export function vimshottariTimeline(moonLongitude, birthDate, asOf = new Date()) {
@@ -158,6 +181,16 @@ export function evaluateDomain(result, key) {
   const domain = result.charts[spec.varga] || d1;
   const evidence = [];
   let support = 0; let friction = 0;
+  if(key==="money") {
+    const secondLord=houseLord(d1,2),eleventhLord=houseLord(d1,11);
+    if(secondLord===eleventhLord) {
+      support+=2;
+      evidence.push({tone:"support",source:"P0/P1 BPHS + P5 synthesis",title:`${secondLord} jointly carries H2 and H11`,detail:`Accumulation (H2) and gains (H11) share one controller placed in D1 house ${bodyHouse(d1,secondLord)}. Its condition must be checked in both D1 and D2.`});
+    } else if(bodyHouse(d1,secondLord)===bodyHouse(d1,eleventhLord)) {
+      support+=2;
+      evidence.push({tone:"support",source:"P1/P5",title:"H2 and H11 lords are conjoined",detail:`${secondLord} and ${eleventhLord} combine accumulation and gains in D1 house ${bodyHouse(d1,secondLord)}.`});
+    }
+  }
   for (const house of spec.houses) {
     const natalRow = rowByHouse(d1, house);
     const lord = houseLord(d1, house);

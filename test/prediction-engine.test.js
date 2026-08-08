@@ -62,4 +62,14 @@ describe("Vimshottari timeline", () => {
     expect(report.overallPromises.nodes).toHaveLength(2);
     expect(report.overallPromises.method.at(-1)).toContain("excluded");
   });
+  it("evaluates D2 by Hora suitability and the combined H2/H11 carrier", () => {
+    const report = buildPredictionReport(result, new Date("2026-08-08T00:00:00Z"));
+    const hora=report.domains.money.confirmation.hora;
+    expect(hora.secondLord).toBe("Mercury");
+    expect(hora.eleventhLord).toBe("Mercury");
+    expect(hora.sameLord).toBe(true);
+    expect(hora.suitableCount).toBe(5);
+    expect(report.domains.money.confirmation.components.find((item)=>item.key==="varga")?.score).toBeGreaterThanOrEqual(68);
+    expect(report.domains.money.confirmation.components.find((item)=>item.key==="varga")?.detail).toContain("Hora suitability");
+  });
 });
