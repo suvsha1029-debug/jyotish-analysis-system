@@ -7,6 +7,24 @@ const DOMAIN_SPECS = Object.freeze({
 });
 
 const byId = (id) => document.getElementById(id);
+const consentGate = byId("consent-gate");
+const consentCheckbox = byId("consent-checkbox");
+const acceptConsent = byId("accept-consent");
+const declineConsent = byId("decline-consent");
+const CONSENT_VERSION = "jyotish-beta-consent-v1";
+
+function openConsentGate() { consentGate.hidden = false; document.body.classList.add("consent-locked"); }
+function closeConsentGate() { consentGate.hidden = true; document.body.classList.remove("consent-locked"); }
+if (localStorage.getItem(CONSENT_VERSION) === "accepted") closeConsentGate(); else openConsentGate();
+consentCheckbox.addEventListener("change", () => { acceptConsent.disabled = !consentCheckbox.checked; });
+acceptConsent.addEventListener("click", () => {
+  if (!consentCheckbox.checked) return;
+  localStorage.setItem(CONSENT_VERSION, "accepted"); closeConsentGate();
+});
+declineConsent.addEventListener("click", () => {
+  consentCheckbox.checked = false; acceptConsent.disabled = true;
+  byId("declined-message").hidden = false;
+});
 const form = byId("chart-form");
 const calculateButton = form.querySelector(".calculate");
 const status = byId("status");

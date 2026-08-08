@@ -84,3 +84,24 @@ input { height:42px; padding:0 11px; border:1px solid #aeb8c4; border-radius:0; 
 .analysis-table thead th { background:#e7ebef; }.analysis-table .sav-row th,.analysis-table .sav-row td { background:#35465c; }.point-chip,.node-card { border-radius:0; background:#f5f6f7; }
 footer { background:#243247; border-top:3px solid #9b782c; }
 @media(max-width:620px) { .hero { padding-top:24px; }.profile-card { max-width:none; }.positions-grid { grid-template-columns:1fr 1fr; } h1 { font-size:29px; } }
+body.consent-locked { overflow: hidden; }
+.consent-gate { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 24px; background: rgba(9, 16, 29, .86); backdrop-filter: blur(5px); }
+.consent-gate[hidden] { display: none; }
+.consent-dialog { width: min(680px, 100%); max-height: 92vh; overflow: auto; padding: 34px; border: 1px solid #9a7a32; background: #f8f5ed; color: #172238; box-shadow: 0 24px 80px rgba(0,0,0,.45); }
+.consent-dialog h1 { margin: 14px 0; font-family: Georgia, serif; font-size: clamp(1.8rem, 4vw, 2.6rem); }
+.beta-stamp, .top-beta { display: inline-block; padding: 5px 9px; background: #8a2f26; color: #fff; font: 700 11px/1.1 ui-monospace, monospace; letter-spacing: .1em; }
+.top-beta { margin-left: 8px; padding: 4px 7px; vertical-align: middle; }
+.consent-copy { padding: 15px 18px; border-left: 4px solid #b8862f; background: #fffaf0; line-height: 1.55; }
+.consent-copy p { margin: 0 0 10px; }
+.consent-copy p:last-child { margin-bottom: 0; }
+.consent-check { display: flex; gap: 12px; align-items: flex-start; margin: 20px 0; font-weight: 700; line-height: 1.45; }
+.consent-check input { width: 19px; height: 19px; margin-top: 2px; flex: 0 0 auto; }
+.consent-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.consent-actions .calculate { min-width: 190px; }
+.declined-message { margin: 16px 0 0; padding: 12px; background: #f3ded9; color: #76271f; font-weight: 700; }
+.site-warning, .result-warning, .form-warning { border: 1px solid #c69b48; background: #fff6df; color: #513b13; }
+.site-warning { margin: 18px auto 0; padding: 12px 18px; max-width: 1400px; }
+.form-warning { margin: 18px 0 8px; padding: 12px 14px; }
+.result-warning { display: flex; justify-content: space-between; gap: 20px; margin: 0 0 18px; padding: 13px 18px; }
+.result-warning span { text-align: right; }
+@media (max-width: 680px) { .consent-dialog { padding: 22px; } .consent-actions, .result-warning { flex-direction: column; } .result-warning span { text-align: left; } }

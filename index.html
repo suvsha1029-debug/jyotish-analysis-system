@@ -3,22 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Private, browser-based Jyotish divisional chart calculator.">
+  <meta name="description" content="Beta hobby project for experimental Jyotish chart interpretation. Not real-life advice or a final product.">
   <title>Jyotish Analysis System</title>
   <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
+  <div id="consent-gate" class="consent-gate" role="dialog" aria-modal="true" aria-labelledby="consent-title" aria-describedby="consent-copy" hidden>
+    <div class="consent-dialog">
+      <span class="beta-stamp">BETA TESTING · INCOMPLETE</span>
+      <h1 id="consent-title">Please read before continuing</h1>
+      <div id="consent-copy" class="consent-copy">
+        <p>This is an experimental hobby project for astrology chart interpretation. It is not a finished or professionally validated product.</p>
+        <p>Astrology predictions are interpretive and may be inaccurate. They do not predict real-life events with certainty and must not be treated as factual, medical, legal, financial, safety, relationship, career, or other professional advice.</p>
+        <p>Do not make important decisions from this website. Consider your real circumstances and consult a qualified professional where appropriate.</p>
+      </div>
+      <label class="consent-check"><input id="consent-checkbox" type="checkbox"> <span>I understand these limitations and choose to use this beta for personal interest only.</span></label>
+      <div class="consent-actions"><button id="decline-consent" type="button" class="ghost">Decline</button><button id="accept-consent" type="button" class="calculate" disabled>Accept and enter beta</button></div>
+      <p id="declined-message" class="declined-message" hidden>Access remains blocked because you did not accept the beta-use notice. You may review the notice and reconsider.</p>
+    </div>
+  </div>
   <header class="topbar">
-    <a class="brand" href="#">Jyotish Analysis System</a>
+    <a class="brand" href="#">Jyotish Analysis System <b class="top-beta">BETA</b></a>
     <div class="engine-state"><span class="pulse"></span><span id="status">Loading Swiss Ephemeris…</span></div>
   </header>
 
   <main>
+    <aside class="site-warning" role="note"><strong>Beta hobby project—not a final version.</strong> Astrology output is interpretive, may be wrong, and is not a forecast of real-life events or professional advice.</aside>
     <section class="hero">
       <div>
         <p class="eyebrow">Chart calculation and evaluation</p>
         <h1>Jyotish Analysis System</h1>
-        <p class="lede">Deterministic sidereal calculations, divisional charts, structural evidence and period analysis. All calculations remain on this device.</p>
+        <p class="lede">Experimental sidereal chart calculation and interpretation for personal interest. Predictions are not certain real-life outcomes.</p>
       </div>
       <div class="profile-card">
         <span>Active calculation profile</span>
@@ -52,11 +67,13 @@
         <div class="field"><label for="longitude">Longitude</label><input id="longitude" type="number" name="longitude" placeholder="Longitude" min="-180" max="180" step="any" required></div>
         <button class="calculate" type="submit" disabled><span>Calculate charts</span><span aria-hidden="true">→</span></button>
       </form>
-      <p class="privacy-note">◈ Birth data and calculations stay inside your browser. Place search uses OpenStreetMap.</p>
+      <p class="form-warning"><strong>Before calculating:</strong> this beta produces astrology interpretations only. Never use its output as the sole basis for an important decision.</p>
+      <p class="privacy-note">Birth data is sent securely to the private calculation service for processing. Place search uses OpenStreetMap.</p>
       <div id="error" class="error" role="alert" hidden></div>
     </section>
 
     <div id="results" hidden>
+      <aside class="result-warning"><strong>Experimental astrology output · not real-life advice</strong><span>Beta results may be incomplete or inaccurate. Verify birth data and use considerate personal judgment.</span></aside>
       <section class="result-header">
         <div><p class="eyebrow">Calculated chart</p><h2 id="result-title">Varga overview</h2><p id="result-meta"></p></div>
         <div class="lagna-orb"><span>Rāśi Lagna</span><strong id="rasi-lagna">—</strong></div>
@@ -108,7 +125,7 @@
     </div>
   </main>
 
-  <footer><span>Jyotish Analysis System</span><p>D60 is extremely birth-time sensitive. Use a well-rectified birth time.</p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">Location data © OpenStreetMap</a></footer>
+  <footer><span>Jyotish Analysis System · BETA HOBBY PROJECT</span><p>Not a final product or professional advice. Astrology cannot guarantee real-life events. D60 is extremely birth-time sensitive.</p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">Location data © OpenStreetMap</a></footer>
   <script type="module" src="/src/demo.js"></script>
 </body>
 </html>
