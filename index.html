@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Private, browser-based Jyotish divisional chart calculator.">
+  <title>Jyotish Analysis System</title>
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#">Jyotish Analysis System</a>
+    <div class="engine-state"><span class="pulse"></span><span id="status">Loading Swiss Ephemeris…</span></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Chart calculation and evaluation</p>
+        <h1>Jyotish Analysis System</h1>
+        <p class="lede">Deterministic sidereal calculations, divisional charts, structural evidence and period analysis. All calculations remain on this device.</p>
+      </div>
+      <div class="profile-card">
+        <span>Active calculation profile</span>
+        <strong>Swiss Ephemeris</strong>
+        <dl><div><dt>Zodiac</dt><dd>Sidereal</dd></div><div><dt>Ayanāṃśa</dt><dd>Lahiri</dd></div><div><dt>Nodes</dt><dd>Mean</dd></div></dl>
+      </div>
+    </section>
+
+    <section class="input-card" aria-labelledby="birth-heading">
+      <div class="section-heading">
+        <div><span class="step">01</span><h2 id="birth-heading">Birth details</h2></div>
+        <p>Search for a birthplace or enter coordinates manually.</p>
+      </div>
+
+      <div class="location-block">
+        <label for="location-query">Birthplace</label>
+        <div class="search-row">
+          <input id="location-query" autocomplete="off" placeholder="Search city, town or village…">
+          <button id="location-search" class="secondary" type="button">Search place</button>
+          <button id="use-location" class="ghost" type="button" title="Use your device location">Use my location</button>
+        </div>
+        <div id="location-results" class="location-results" hidden></div>
+        <p id="selected-location" class="selected-place">No birthplace selected</p>
+      </div>
+
+      <form id="chart-form">
+        <div class="field"><label for="date">Birth date</label><input id="date" type="date" name="date" required></div>
+        <div class="field"><label for="time">Exact local time</label><input id="time" type="time" name="time" step="1" required></div>
+        <div class="field"><label for="utcOffset">UTC offset</label><input id="utcOffset" name="utcOffset" placeholder="+05:30" pattern="[+-][0-9]{2}:[0-9]{2}" required><small id="timezone-label">Select birthplace</small></div>
+        <div class="field"><label for="latitude">Latitude</label><input id="latitude" type="number" name="latitude" placeholder="Latitude" min="-90" max="90" step="any" required></div>
+        <div class="field"><label for="longitude">Longitude</label><input id="longitude" type="number" name="longitude" placeholder="Longitude" min="-180" max="180" step="any" required></div>
+        <button class="calculate" type="submit" disabled><span>Calculate charts</span><span aria-hidden="true">→</span></button>
+      </form>
+      <p class="privacy-note">◈ Birth data and calculations stay inside your browser. Place search uses OpenStreetMap.</p>
+      <div id="error" class="error" role="alert" hidden></div>
+    </section>
+
+    <div id="results" hidden>
+      <section class="result-header">
+        <div><p class="eyebrow">Calculated chart</p><h2 id="result-title">Varga overview</h2><p id="result-meta"></p></div>
+        <div class="lagna-orb"><span>Rāśi Lagna</span><strong id="rasi-lagna">—</strong></div>
+      </section>
+
+      <section class="positions-card">
+        <div class="section-heading compact"><div><span class="step">02</span><h2>Graha positions</h2></div><p>Lahiri sidereal longitude</p></div>
+        <div id="positions-grid" class="positions-grid"></div>
+        <div class="degree-table-wrap">
+          <table class="degree-table">
+            <thead><tr><th>Body</th><th>Exact sidereal position</th><th>Decimal longitude</th><th>Motion</th></tr></thead>
+            <tbody id="degree-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="charts-section">
+        <div class="section-heading"><div><span class="step">03</span><h2>Divisional charts</h2></div><p>Select any varga to inspect all twelve houses.</p></div>
+        <div class="chart-toolbar">
+          <div id="chart-tabs" class="chart-tabs" role="tablist"></div>
+          <div id="style-tabs" class="style-tabs" aria-label="Chart layout">
+            <button type="button" data-style="north" aria-pressed="true">North Indian</button>
+            <button type="button" data-style="south" aria-pressed="false">South Indian</button>
+            <button type="button" data-style="east" aria-pressed="false">East Indian</button>
+          </div>
+        </div>
+        <article class="chart-card">
+          <div class="chart-title"><div><p id="chart-code">D1</p><h3 id="chart-name">Rāśi</h3></div><div class="varga-lagna">Varga Lagna <strong id="varga-lagna">—</strong></div></div>
+          <div id="chart-grid" class="vedic-chart north-chart" aria-live="polite"></div>
+          <div class="mini-tables">
+            <div><h4>Varga degrees</h4><div class="mini-table-scroll"><table class="mini-table"><thead><tr><th>Body</th><th>Degree</th><th>Sign</th><th>House</th></tr></thead><tbody id="varga-degree-body"></tbody></table></div></div>
+            <div><h4>House summary</h4><div class="mini-table-scroll"><table class="mini-table"><thead><tr><th>House</th><th>Sign</th><th>Occupants</th></tr></thead><tbody id="house-summary-body"></tbody></table></div></div>
+          </div>
+          <section id="d60-amsha-panel" class="d60-amsha-panel" hidden>
+            <div class="d60-amsha-head"><div><h4>D60 Shashtiamsa amshas</h4><p>BPHS names and benefic/malefic nature. Odd signs run forward; even signs reverse.</p></div><strong>Birth-time sensitive</strong></div>
+            <div class="analysis-scroll"><table class="analysis-table"><thead><tr><th>Body</th><th>Amsha</th><th>Nature</th><th>Classification</th></tr></thead><tbody id="d60-amsha-body"></tbody></table></div>
+            <p class="limitations">D60 is a fine confirmation layer. A small birth-time error can change the amsha, so it must never override D1 promise or MD-AD activation.</p>
+          </section>
+        </article>
+      </section>
+
+      <section class="insights-section" aria-labelledby="insights-heading">
+        <div class="section-heading"><div><span class="step">04</span><h2 id="insights-heading">Prediction workspace</h2></div><p>Evidence-led domains and MD-AD timing from the supplied rulebook.</p></div>
+        <div id="insight-tabs" class="insight-tabs" role="tablist" aria-label="Prediction topics"></div>
+        <article class="insight-card">
+          <div id="insight-content"></div>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <footer><span>Jyotish Analysis System</span><p>D60 is extremely birth-time sensitive. Use a well-rectified birth time.</p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">Location data © OpenStreetMap</a></footer>
+  <script type="module" src="/src/demo.js"></script>
+</body>
+</html>
