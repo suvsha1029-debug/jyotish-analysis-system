@@ -229,6 +229,40 @@ function buildForeignAnalysis(result,structural,current) {
   };
 }
 
+function buildOverallPromises(result, structural, domains) {
+  const arudhaMap={overview:"AL",money:"A2",career:"A10",fame:"AL",marriage:"UL",foreign:"A9",property:"A4",vehicles:"A4",gains:"A11"};
+  const rows=Object.values(domains).map((domain)=>{
+    const natal=domain.confirmation.components.filter((item)=>item.key!=="timing");
+    const totalWeight=natal.reduce((sum,item)=>sum+item.weight,0);
+    const natalScore=natal.reduce((sum,item)=>sum+item.score*item.weight,0)/totalWeight;
+    const promise=natalScore>=68?"Good":natalScore>=45?"Moderate":"Low";
+    const arudhaKey=arudhaMap[domain.key], arudha=structural.arudhas[arudhaKey];
+    const nodes=structural.nodes.filter((node)=>domain.houses.includes(node.house)||domain.houses.includes(structural.planets[node.signDispositor]?.house));
+    const support=domain.evidence.filter((item)=>item.tone==="support").slice(0,3);
+    const cautions=domain.evidence.filter((item)=>item.tone==="caution").slice(0,2);
+    return {key:domain.key,label:domain.label,varga:domain.varga,promise,arudhaKey,arudha,nodes,support,cautions,
+      layers:natal.map((item)=>({key:item.key,label:item.label,level:item.score>=68?"Good":item.score>=45?"Moderate":"Low",detail:item.detail}))};
+  });
+  const counts={Good:rows.filter((row)=>row.promise==="Good").length,Moderate:rows.filter((row)=>row.promise==="Moderate").length,Low:rows.filter((row)=>row.promise==="Low").length};
+  const overall=counts.Good>=Math.ceil(rows.length/2)?"Good":counts.Low>=Math.ceil(rows.length/2)?"Low":"Moderate";
+  return {
+    overall,counts,rows,
+    specialPoints:Object.entries(structural.arudhas).filter(([key])=>["AL","A2","A4","A9","A10","A11","UL"].includes(key)).map(([key,value])=>({key,...value})),
+    nodes:structural.nodes,
+    unavailable:structural.unavailable.filter((item)=>/Lagna/.test(item)),
+    method:[
+      "D1 establishes stored structural promise and receives priority over every confirming layer.",
+      "Functional lordship, dignity, dispositors, aspects and configured yogas describe delivery quality.",
+      "BAV/SAV confirm manifestation support; they do not replace the house lord or D1 promise.",
+      "The relevant divisional chart specializes the topic; independent repetition raises confidence.",
+      "Arudha Lagna and topic Arudhas describe visible or material manifestation.",
+      "Rahu and Ketu are interpreted through house, sign lord, nakshatra lord and cross-Varga reinforcement.",
+      "MD-AD, transits and current dates are deliberately excluded from this tab.",
+    ],
+    sources:["Master Rulebook V2 §§11-21 (hierarchy, AV, Arudha and Varga repetition)","Master Rulebook V2 §§42-46 (Trivedi-style nodal chain)","BPHS-derived dignity, lordship, Varga and yoga framework; paraphrased operationally"],
+  };
+}
+
 export function buildPredictionReport(result, asOf = new Date()) {
   const structural = buildStructuralAnalysis(result);
   const birthDate = new Date(result.utc);
@@ -255,6 +289,7 @@ export function buildPredictionReport(result, asOf = new Date()) {
     return [key,domain];
   }));
   const foreignAnalysis=buildForeignAnalysis(result,structural,current);
+  const overallPromises=buildOverallPromises(result,structural,domains);
   return {
     generatedFor: isoDay(asOf),
     domains,
@@ -262,6 +297,7 @@ export function buildPredictionReport(result, asOf = new Date()) {
     timeline,
     currentPeriod: current || null,
     foreignAnalysis,
+    overallPromises,
     readingOrder: [
       "Start with D1 structural promise and functional house lords.",
       "Open the relevant domain Varga; repetition is stronger than one isolated indication.",

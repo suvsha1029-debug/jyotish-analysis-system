@@ -54,4 +54,12 @@ describe("Vimshottari timeline", () => {
       expect(["Good","Moderate","Low"]).toContain(domain.dimensions.strength);
     }
   });
+  it("builds overall natal promises without timing components", () => {
+    const report = buildPredictionReport(result, new Date("2026-08-08T00:00:00Z"));
+    expect(report.overallPromises.rows).toHaveLength(Object.keys(DOMAIN_SPECS).length);
+    expect(report.overallPromises.rows.every((row) => row.layers.every((layer) => layer.key !== "timing"))).toBe(true);
+    expect(report.overallPromises.specialPoints.some((point) => point.key === "AL")).toBe(true);
+    expect(report.overallPromises.nodes).toHaveLength(2);
+    expect(report.overallPromises.method.at(-1)).toContain("excluded");
+  });
 });

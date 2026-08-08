@@ -58,10 +58,12 @@ function updateTimezone() {
 
 function selectPlace(place) {
   selectedLocation = place.name;
+  byId("location-query").value = place.name;
   byId("selected-location").textContent = place.name;
   byId("latitude").value = place.latitude.toFixed(6);
   byId("longitude").value = place.longitude.toFixed(6);
   byId("location-results").hidden = true;
+  localStorage.setItem("jyotish-last-place", JSON.stringify({ name:place.name, latitude:place.latitude, longitude:place.longitude }));
   updateTimezone();
 }
 
@@ -166,6 +168,16 @@ function renderConfirmation() {
   document.querySelectorAll("[data-timing-domain]").forEach((button)=>button.addEventListener("click",()=>openTimingDialog(button.dataset.timingDomain)));
 }
 
+function renderOverallPromises() {
+  selectedInsight="promises";
+  document.querySelectorAll(".insight-tab").forEach((tab)=>tab.setAttribute("aria-selected",String(tab.dataset.insight===selectedInsight)));
+  const report=currentPrediction.overallPromises;
+  const rows=report.rows.map((row)=>`<details class="promise-domain" ${row.key==="overview"?"open":""}><summary><span><b>${row.label}</b><small>${row.varga} confirmation · ${row.arudhaKey} ${row.arudha?`in H${row.arudha.house} ${row.arudha.sign}`:"unavailable"}</small></span><em class="promise-level ${row.promise.toLowerCase()}">${row.promise}</em></summary><div class="promise-domain-body"><div class="promise-layers">${row.layers.map((layer)=>`<article><span>${layer.label}</span><b class="${layer.level.toLowerCase()}">${layer.level}</b><p>${layer.detail}</p></article>`).join("")}</div><div class="promise-evidence"><section><h4>Supporting structure</h4>${row.support.map((item)=>`<p><b>${item.title}</b>${item.detail}</p>`).join("")||"<p>No configured support item.</p>"}</section><section><h4>Contradictions / cautions</h4>${row.cautions.map((item)=>`<p><b>${item.title}</b>${item.detail}</p>`).join("")||"<p>No major configured contradiction.</p>"}</section></div>${row.nodes.length?`<div class="promise-node-note"><b>Rahu-Ketu involvement</b>${row.nodes.map((node)=>`${node.node} in H${node.house} ${node.sign}; sign controller ${node.signDispositor}, nakshatra controller ${node.nakshatraLord}${node.repeatedVargas.length?`; repeated in ${node.repeatedVargas.join(", ")}`:""}.`).join(" ")}</div>`:""}</div></details>`).join("");
+  const points=report.specialPoints.map((point)=>`<article><b>${point.key}</b><span>H${point.house} · ${point.sign}</span><small>From H${point.sourceHouse}, lord ${point.lord}</small></article>`).join("");
+  const nodes=report.nodes.map((node)=>`<article><span>${node.node} · ${node.axis}</span><h4>${node.sign} in H${node.house}</h4><p>Sign lord ${node.signDispositor}; nakshatra lord ${node.nakshatraLord}. ${node.repeatedVargas.length?`House repetition: ${node.repeatedVargas.join(", ")}.`:"No same-house repetition in the configured supporting Vargas."}</p><small>${node.source}</small></article>`).join("");
+  byId("insight-content").innerHTML=`<div class="insight-head"><div><h3>Overall natal promises</h3><p>Stored potential before MD-AD, transit or date-based activation.</p></div><span class="varga-badge">Timing excluded</span></div><div class="promise-summary"><div><span>Overall structural picture</span><strong>${report.overall}</strong></div><p><b>${report.counts.Good}</b> good · <b>${report.counts.Moderate}</b> moderate · <b>${report.counts.Low}</b> low topic promises</p></div><div class="promise-method">${report.method.map((item,index)=>`<p><b>${index+1}</b>${item}</p>`).join("")}</div><h4 class="analysis-title">Verified special manifestation points</h4><div class="special-point-grid">${points}</div><p class="limitations">${report.unavailable.join("; ")}. These sunrise-dependent points are shown as unavailable rather than estimated. Arudha points above are calculated and used as manifestation references.</p><h4 class="analysis-title">Rahu-Ketu structural axis</h4><p class="node-interpretive-note">Some modern traditions give the nodes special prominence in Kali Yuga. This application labels that as an interpretive belief, not an empirical fact, and still judges each node through its controllers and repeated chart context.</p><div class="promise-node-grid">${nodes}</div><h4 class="analysis-title">Domain promises without timing</h4><div class="promise-domains">${rows}</div><div class="source-key"><strong>Method sources:</strong> ${report.sources.join(" · ")}. Classical and modern source rules are paraphrased; no timing component enters the promise rating.</div>`;
+}
+
 function openTimingDialog(domainKey) {
   const domain=currentPrediction.domains[domainKey];
   const timing=domain.confirmation.components.find((item)=>item.key==="timing");
@@ -240,9 +252,9 @@ function renderReadingGuide() {
 function renderPredictionWorkspace(result) {
   currentPrediction = result.prediction;
   const tabs = byId("insight-tabs"); tabs.replaceChildren();
-  [...Object.entries(DOMAIN_SPECS).map(([key, spec]) => ({ key, label: spec.label })), {key:"confirmation",label:"Confirmation"},{key:"ashtakavarga",label:"Ashtakavarga"},{key:"structure",label:"Lords & yogas"},{key:"nodes",label:"Rahu-Ketu"}, { key: "timeline", label: "Timeline" }, { key: "guide", label: "How to read" }].forEach(({ key, label }) => {
+  [...Object.entries(DOMAIN_SPECS).map(([key, spec]) => ({ key, label: spec.label })), {key:"promises",label:"Overall promises"},{key:"confirmation",label:"Confirmation"},{key:"ashtakavarga",label:"Ashtakavarga"},{key:"structure",label:"Lords & yogas"},{key:"nodes",label:"Rahu-Ketu"}, { key: "timeline", label: "Timeline" }, { key: "guide", label: "How to read" }].forEach(({ key, label }) => {
     const tab = document.createElement("button"); tab.type = "button"; tab.role = "tab"; tab.className = "insight-tab"; tab.dataset.insight = key; tab.textContent = label; tab.setAttribute("aria-selected", String(key === selectedInsight));
-    tab.addEventListener("click", () => key === "timeline" ? renderTimelineThemes() : key === "guide" ? renderReadingGuide() : key === "confirmation" ? renderConfirmation() : key === "ashtakavarga" ? renderAshtakavarga() : key === "structure" ? renderStructure() : key === "nodes" ? renderNodes() : renderDomainInsight(key));
+    tab.addEventListener("click", () => key === "timeline" ? renderTimelineThemes() : key === "guide" ? renderReadingGuide() : key === "promises" ? renderOverallPromises() : key === "confirmation" ? renderConfirmation() : key === "ashtakavarga" ? renderAshtakavarga() : key === "structure" ? renderStructure() : key === "nodes" ? renderNodes() : renderDomainInsight(key));
     tabs.append(tab);
   });
   renderDomainInsight(DOMAIN_SPECS[selectedInsight] ? selectedInsight : "overview");
@@ -275,6 +287,10 @@ function renderResult(result) {
 
 byId("location-search").addEventListener("click", runLocationSearch);
 byId("location-query").addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); runLocationSearch(); } });
+try {
+  const savedPlace=JSON.parse(localStorage.getItem("jyotish-last-place")||"null");
+  if(savedPlace?.name&&Number.isFinite(savedPlace.latitude)&&Number.isFinite(savedPlace.longitude)) selectPlace(savedPlace);
+} catch { localStorage.removeItem("jyotish-last-place"); }
 byId("use-location").addEventListener("click", () => {
   clearError();
   if (!navigator.geolocation) return showError("Location is not available in this browser.");
