@@ -29,5 +29,4 @@ app.post("/api/chart", async (req, res) => {
 app.use(express.static("dist", { etag: true, maxAge: "1h" }));
 app.get("/{*path}", (_req, res) => res.sendFile("index.html", { root: "dist" }));
 
-const port = Number(process.env.PORT || 4173);
-app.listen(port, () => console.log(`Jyotish server listening on http://localhost:${port}`));
+export default app;

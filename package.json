@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node server/app.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "@swisseph/browser": "1.3.1",
