@@ -11,15 +11,21 @@ const consentGate = byId("consent-gate");
 const consentCheckbox = byId("consent-checkbox");
 const acceptConsent = byId("accept-consent");
 const declineConsent = byId("decline-consent");
-const CONSENT_VERSION = "jyotish-beta-consent-v1";
 
 function openConsentGate() { consentGate.hidden = false; document.body.classList.add("consent-locked"); }
 function closeConsentGate() { consentGate.hidden = true; document.body.classList.remove("consent-locked"); }
-if (localStorage.getItem(CONSENT_VERSION) === "accepted") closeConsentGate(); else openConsentGate();
+function requireFreshConsent() {
+  consentCheckbox.checked = false;
+  acceptConsent.disabled = true;
+  byId("declined-message").hidden = true;
+  openConsentGate();
+}
+requireFreshConsent();
+window.addEventListener("pageshow", requireFreshConsent);
 consentCheckbox.addEventListener("change", () => { acceptConsent.disabled = !consentCheckbox.checked; });
 acceptConsent.addEventListener("click", () => {
   if (!consentCheckbox.checked) return;
-  localStorage.setItem(CONSENT_VERSION, "accepted"); closeConsentGate();
+  closeConsentGate();
 });
 declineConsent.addEventListener("click", () => {
   consentCheckbox.checked = false; acceptConsent.disabled = true;
