@@ -160,9 +160,26 @@ function renderConfirmation() {
   const first=Object.values(currentPrediction.domains)[0].confirmation;
   const headers=first.components.map((item)=>`<th>${item.chart}</th>`).join("");
   const level=(score)=>score>=68?"Good":score>=45?"Moderate":"Low";
-  const rows=Object.values(currentPrediction.domains).map((domain)=>`<tr><th>${domain.label}<small>${domain.varga}</small></th>${domain.confirmation.components.map((item)=>`<td><span class="score-cell ${level(item.score).toLowerCase()}">${level(item.score)}</span></td>`).join("")}<td><b>${domain.confirmation.label}</b></td></tr>`).join("");
+  const rows=Object.values(currentPrediction.domains).map((domain)=>`<tr><th>${domain.label}<small>${domain.varga}</small></th>${domain.confirmation.components.map((item)=>`<td>${item.key==="timing"?`<button type="button" class="score-cell timing-score ${level(item.score).toLowerCase()}" data-timing-domain="${domain.key}" aria-label="Open ${domain.label} timing overview">${level(item.score)}</button>`:`<span class="score-cell ${level(item.score).toLowerCase()}">${level(item.score)}</span>`}</td>`).join("")}<td><b>${domain.confirmation.label}</b></td></tr>`).join("");
   byId("insight-content").innerHTML=`<div class="insight-head"><div><h3>Divisional confirmation</h3><p>D1 governs the promise. The relevant division confirms it; MD-AD shows whether that promise is active now.</p></div><span class="varga-badge">Chart synthesis</span></div><div class="analysis-scroll"><table class="analysis-table confirmation-table"><thead><tr><th>Domain</th>${headers}<th>Final</th></tr></thead><tbody>${rows}</tbody></table></div><p class="limitations">${first.methodNote} D60 is used only with a sufficiently accurate birth time.</p>`;
+  document.querySelectorAll("[data-timing-domain]").forEach((button)=>button.addEventListener("click",()=>openTimingDialog(button.dataset.timingDomain)));
 }
+
+function openTimingDialog(domainKey) {
+  const domain=currentPrediction.domains[domainKey];
+  const timing=domain.confirmation.components.find((item)=>item.key==="timing");
+  const periods=currentPrediction.timeline.periods.filter((period)=>period.theme.domains.some((item)=>item.label===domain.label));
+  const current=periods.find((period)=>period.current);
+  const upcoming=periods.filter((period)=>period.phase==="upcoming").slice(0,6);
+  const currentHtml=current?`<section class="timing-current"><span>ACTIVE NOW</span><h3>${current.mdLord}–${current.adLord}</h3><p>${current.start} to ${current.end}</p><strong>${current.theme.delivery} activation · ${current.theme.headline}</strong><small>${current.theme.summary}</small></section>`:`<section class="timing-current inactive"><span>ACTIVE NOW</span><h3>No focused ${domain.label} window</h3><p>The present MD–AD does not rank this topic among its leading activated domains.</p></section>`;
+  const windows=upcoming.length?upcoming.map((period)=>`<article><div><span>${period.theme.delivery}</span><b>${period.mdLord}–${period.adLord}</b></div><strong>${period.start} → ${period.end}</strong><p>${period.theme.headline} · ${period.geometry.relation}</p></article>`).join(""):`<p class="timing-empty">No future focused window is available in the calculated timeline.</p>`;
+  byId("timing-dialog-title").textContent=`${domain.label} timing · ${timing.score>=68?"Good":timing.score>=45?"Moderate":"Low"}`;
+  byId("timing-dialog-content").innerHTML=`<p class="timing-explanation">${timing.detail}</p>${currentHtml}<h3 class="timing-subtitle">Upcoming activation windows</h3><div class="timing-windows">${windows}</div><p class="limitations">These windows describe astrological MD–AD emphasis, not guaranteed events. D1 promise, ${domain.varga} confirmation, SAV and D60 remain supporting layers.</p>`;
+  byId("timing-dialog").showModal();
+}
+
+byId("close-timing-dialog").addEventListener("click",()=>byId("timing-dialog").close());
+byId("timing-dialog").addEventListener("click",(event)=>{ if(event.target===byId("timing-dialog")) byId("timing-dialog").close(); });
 
 function renderAshtakavarga() {
   selectedInsight="ashtakavarga";
