@@ -1,15 +1,16 @@
-import { calculateChart } from "./varga-engine.js";
-import { BrowserSwissEphemerisAdapter } from "./swisseph-adapter.js";
 import { historicalUtcOffset, searchLocations, timezoneForCoordinates } from "./location-service.js";
 import { cellsForStyle } from "./chart-layouts.js";
-import { buildPredictionReport, DOMAIN_SPECS } from "./prediction-engine.js";
+
+const DOMAIN_SPECS = Object.freeze({
+  overview:{label:"Overview"}, money:{label:"Money"}, career:{label:"Career"}, fame:{label:"Fame & authority"},
+  marriage:{label:"Marriage"}, foreign:{label:"Foreign"}, property:{label:"Property"}, vehicles:{label:"Vehicles"}, gains:{label:"Gains"},
+});
 
 const byId = (id) => document.getElementById(id);
 const form = byId("chart-form");
 const calculateButton = form.querySelector(".calculate");
 const status = byId("status");
 const errorBox = byId("error");
-const ephemeris = new BrowserSwissEphemerisAdapter();
 let currentResult = null;
 let selectedLocation = "Birth chart";
 let selectedChartCode = "D1";
@@ -193,7 +194,7 @@ function renderReadingGuide() {
 }
 
 function renderPredictionWorkspace(result) {
-  currentPrediction = buildPredictionReport(result);
+  currentPrediction = result.prediction;
   const tabs = byId("insight-tabs"); tabs.replaceChildren();
   [...Object.entries(DOMAIN_SPECS).map(([key, spec]) => ({ key, label: spec.label })), {key:"confirmation",label:"Confirmation"},{key:"ashtakavarga",label:"Ashtakavarga"},{key:"structure",label:"Lords & yogas"},{key:"nodes",label:"Rahu-Ketu"}, { key: "timeline", label: "Timeline" }, { key: "guide", label: "How to read" }].forEach(({ key, label }) => {
     const tab = document.createElement("button"); tab.type = "button"; tab.role = "tab"; tab.className = "insight-tab"; tab.dataset.insight = key; tab.textContent = label; tab.setAttribute("aria-selected", String(key === selectedInsight));
@@ -241,12 +242,16 @@ byId("use-location").addEventListener("click", () => {
 form.addEventListener("submit", async (event) => {
   event.preventDefault(); clearError(); calculateButton.disabled = true;
   calculateButton.querySelector("span").textContent = "Calculating…";
-  try { renderResult(await calculateChart(Object.fromEntries(new FormData(form)), ephemeris)); }
+  try {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/api/chart`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(new FormData(form))),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "Calculation failed.");
+    renderResult(payload);
+  }
   catch (error) { showError(error.message); }
   finally { calculateButton.disabled = false; calculateButton.querySelector("span").textContent = "Calculate charts"; }
 });
 
-try {
-  await ephemeris.init();
-  status.textContent = "Swiss Ephemeris ready"; calculateButton.disabled = false;
-} catch (error) { status.textContent = "Engine unavailable"; showError(`Could not load Swiss Ephemeris: ${error.message}`); }
+status.textContent = "Secure calculation service ready"; calculateButton.disabled = false;
