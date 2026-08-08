@@ -254,6 +254,7 @@ button, input { max-width: 100%; touch-action: manipulation; }
 .timing-current strong, .timing-current small { display: block; }
 .timing-current small { margin-top: 7px; color: #e2f2ef; line-height: 1.5; }
 .timing-subtitle { margin: 22px 0 10px; font: 700 17px Georgia,serif; }
+.timing-support-note { margin: -3px 0 11px; padding: 9px 11px; color: #765f30; background: #fff6df; border: 1px solid #dfcb9e; font-size: 10px; line-height: 1.5; }
 .timing-windows { display: grid; gap: 8px; }
 .timing-windows article { display: grid; grid-template-columns: 150px 190px 1fr; gap: 12px; align-items: center; padding: 11px 12px; border: 1px solid #d4d9df; background: #fff; }
 .timing-windows article div span, .timing-windows article div b { display: block; }
