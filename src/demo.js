@@ -70,12 +70,14 @@ function selectPlace(place) {
 async function runLocationSearch() {
   clearError();
   const button = byId("location-search");
+  const query=byId("location-query").value.trim();
+  if(query.length<2) return showError("Enter at least two characters, then press Enter or Search place.");
   button.disabled = true; button.textContent = "Searching…";
   try {
-    const places = await searchLocations(byId("location-query").value);
+    const places = await searchLocations(query);
     const container = byId("location-results");
     container.replaceChildren();
-    if (!places.length) throw new Error("No matching place was found.");
+    if (!places.length) throw new Error(`No matching place was found for “${query}”. Try city, state and country.`);
     places.forEach((place) => {
       const option = document.createElement("button");
       option.type = "button"; option.className = "place-option"; option.textContent = place.name;

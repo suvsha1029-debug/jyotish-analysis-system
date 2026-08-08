@@ -16,12 +16,13 @@ describe("location and timezone helpers", () => {
   it("normalizes geocoder results", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => [{ display_name: "Amritsar, Punjab, India", lat: "31.634", lon: "74.8723" }],
+      json: async () => ({ places:[{ name: "Amritsar, Punjab, India", latitude: 31.634, longitude: 74.8723 }] }),
     });
     await expect(searchLocations("Amritsar", fetchMock)).resolves.toEqual([
       { name: "Amritsar, Punjab, India", latitude: 31.634, longitude: 74.8723 },
     ]);
     expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/locations?q=Amritsar");
   });
 
   it("rejects invalid coordinates and short searches", async () => {

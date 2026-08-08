@@ -42,16 +42,9 @@ export function historicalUtcOffset(timeZone, date, time) {
 export async function searchLocations(query, fetchImpl = fetch) {
   const normalized = query.trim();
   if (normalized.length < 2) throw new RangeError("Enter at least two characters for location search.");
-  const url = new URL("https://nominatim.openstreetmap.org/search");
-  url.searchParams.set("format", "jsonv2");
-  url.searchParams.set("q", normalized);
-  url.searchParams.set("limit", "5");
-  url.searchParams.set("addressdetails", "1");
-  const response = await fetchImpl(url, { headers: { Accept: "application/json", "Accept-Language": "en" } });
+  const response = await fetchImpl(`/api/locations?q=${encodeURIComponent(normalized)}`, { headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error("Location service is temporarily unavailable.");
-  return (await response.json()).map((item) => ({
-    name: item.display_name,
-    latitude: Number(item.lat),
-    longitude: Number(item.lon),
-  }));
+  const payload=await response.json();
+  if(payload.error) throw new Error(payload.error);
+  return payload.places;
 }
