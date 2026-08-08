@@ -102,6 +102,13 @@ body.consent-locked { overflow: hidden; }
 .consent-dialog h1 { margin: 14px 0; font-family: Georgia, serif; font-size: clamp(1.8rem, 4vw, 2.6rem); }
 .beta-stamp, .top-beta { display: inline-block; padding: 5px 9px; background: #8a2f26; color: #fff; font: 700 11px/1.1 ui-monospace, monospace; letter-spacing: .1em; }
 .top-beta { margin-left: 8px; padding: 4px 7px; vertical-align: middle; }
+@keyframes beta-testing-flash {
+  0%, 38%, 100% { background: #a31515; color: #fff; box-shadow: 0 0 0 0 rgba(213, 31, 31, .55); transform: scale(1); }
+  50% { background: #ef2525; color: #fff7c2; box-shadow: 0 0 0 7px rgba(213, 31, 31, 0); transform: scale(1.045); }
+  62% { background: #6f0c0c; color: #fff; box-shadow: 0 0 0 0 rgba(213, 31, 31, 0); transform: scale(1); }
+}
+.beta-stamp, .top-beta { animation: beta-testing-flash 1.35s ease-in-out infinite; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) { .beta-stamp, .top-beta { animation: none; background: #c71818; } }
 .consent-copy { padding: 15px 18px; border-left: 4px solid #b8862f; background: #fffaf0; line-height: 1.55; }
 .consent-copy p { margin: 0 0 10px; }
 .consent-copy p:last-child { margin-bottom: 0; }
