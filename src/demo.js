@@ -158,7 +158,8 @@ function renderConfirmation() {
   selectedInsight="confirmation";
   document.querySelectorAll(".insight-tab").forEach((tab)=>tab.setAttribute("aria-selected",String(tab.dataset.insight===selectedInsight)));
   const first=Object.values(currentPrediction.domains)[0].confirmation;
-  const headers=first.components.map((item)=>`<th>${item.chart}</th>`).join("");
+  const columnLabels={d1:"D1 promise",varga:"Relevant Varga",ashtakavarga:"SAV",structure:"Structure",timing:"Timing"};
+  const headers=first.components.map((item)=>`<th>${columnLabels[item.key]||item.chart}</th>`).join("");
   const level=(score)=>score>=68?"Good":score>=45?"Moderate":"Low";
   const rows=Object.values(currentPrediction.domains).map((domain)=>`<tr><th>${domain.label}<small>${domain.varga}</small></th>${domain.confirmation.components.map((item)=>`<td>${item.key==="timing"?`<button type="button" class="score-cell timing-score ${level(item.score).toLowerCase()}" data-timing-domain="${domain.key}" aria-label="Open ${domain.label} timing overview">${level(item.score)}</button>`:`<span class="score-cell ${level(item.score).toLowerCase()}">${level(item.score)}</span>`}</td>`).join("")}<td><b>${domain.confirmation.label}</b></td></tr>`).join("");
   byId("insight-content").innerHTML=`<div class="insight-head"><div><h3>Divisional confirmation</h3><p>D1 governs the promise. The relevant division confirms it; MD-AD shows whether that promise is active now.</p></div><span class="varga-badge">Chart synthesis</span></div><div class="analysis-scroll"><table class="analysis-table confirmation-table"><thead><tr><th>Domain</th>${headers}<th>Final</th></tr></thead><tbody>${rows}</tbody></table></div><p class="limitations">${first.methodNote} D60 is used only with a sufficiently accurate birth time.</p>`;
