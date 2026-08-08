@@ -72,4 +72,19 @@ describe("Vimshottari timeline", () => {
     expect(report.domains.money.confirmation.components.find((item)=>item.key==="varga")?.score).toBeGreaterThanOrEqual(68);
     expect(report.domains.money.confirmation.components.find((item)=>item.key==="varga")?.detail).toContain("Hora suitability");
   });
+  it("uses a D4-specific foreign frame including badhaka and Rahu", () => {
+    const report=buildPredictionReport(result,new Date("2026-08-08T00:00:00Z"));
+    const method=report.domains.foreign.confirmation.vargaAnalysis;
+    expect(method.chart).toBe("D4");
+    expect(method.houses.map((item)=>item.house)).toEqual(expect.arrayContaining([3,7,9,12,method.badhaka.house]));
+    expect(method.karakas.map((item)=>item.planet)).toContain("Rahu");
+    expect(method.method).toContain("badhaka");
+  });
+  it("builds foreign-spouse confirmation from D1 and the D9 spouse reference", () => {
+    const report=buildPredictionReport(result,new Date("2026-08-08T00:00:00Z"));
+    expect(report.foreignSpouseAnalysis.spouseLord).toBeTruthy();
+    expect(report.foreignSpouseAnalysis.placements.map((item)=>item.planet)).toEqual(expect.arrayContaining(["Rahu","Ketu","Venus","Jupiter"]));
+    expect(report.foreignSpouseAnalysis.method).toContain("D9 7th");
+    expect(["Good","Moderate","Low"]).toContain(report.foreignSpouseAnalysis.level);
+  });
 });

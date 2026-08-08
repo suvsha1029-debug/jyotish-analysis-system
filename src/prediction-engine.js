@@ -8,15 +8,15 @@ export const PLANET_RULERS = Object.freeze({
 });
 
 export const DOMAIN_SPECS = Object.freeze({
-  overview: { label: "Overview", varga: "D1", houses: [1, 5, 9, 10, 11], description: "Structural promise and the strongest repeated themes." },
-  money: { label: "Money", varga: "D2", houses: [2, 5, 9, 10, 11, 12], description: "Earning, accumulation, retention, expenses and scalability." },
-  career: { label: "Career", varga: "D10", houses: [1, 2, 6, 9, 10, 11], description: "Professional direction, activity, achievement and status." },
-  fame: { label: "Fame & authority", varga: "D5", houses: [1, 5, 9, 10, 11], description: "Recognition, public authority, influence and power." },
-  marriage: { label: "Marriage", varga: "D9", houses: [1, 2, 7, 8], description: "Partnership promise, harmony, durability and maturation." },
-  foreign: { label: "Foreign", varga: "D4", houses: [4, 9, 12], vargaHouses:[9,12], supportingVargas:["D10","D9"], description: "Foreign movement, residence away from birthplace, work abroad and settlement." },
-  property: { label: "Property", varga: "D4", houses: [2, 4, 8, 11, 12], description: "Land, residence, acquisition, ownership and expenditure." },
-  vehicles: { label: "Vehicles", varga: "D16", houses: [1, 4, 11], description: "Vehicles, comforts, pleasures and visible material quality." },
-  gains: { label: "Gains", varga: "D11", houses: [2, 10, 11], description: "Income conversion, networks, fulfillment and retention." },
+  overview: { label: "Overview", varga: "D1", houses: [1, 5, 9, 10, 11], vargaHouses:[1,5,9,10,11], karakas:["Sun","Jupiter"], method:"D1 Lagna, Lagna lord, trines and angular/action houses establish the natal structure." ,description: "Structural promise and the strongest repeated themes." },
+  money: { label: "Money", varga: "D2", houses: [2, 5, 9, 10, 11, 12], vargaHouses:[1,2,5,9,11], karakas:["Jupiter","Venus"], method:"D1 houses 2 and 11 establish accumulation and gains; Hora evaluates the condition of their carriers and planetary Hora suitability.", description: "Earning, accumulation, retention, expenses and scalability." },
+  career: { label: "Career", varga: "D10", houses: [1, 2, 6, 9, 10, 11], vargaHouses:[1,6,9,10,11], karakas:["Sun","Saturn","Mercury"], method:"D10 Lagna/Lagna lord and houses 6, 9, 10 and 11 specialize work, authority, vocation and gains from activity.", description: "Professional direction, activity, achievement and status." },
+  fame: { label: "Fame & authority", varga: "D5", houses: [1, 5, 9, 10, 11], vargaHouses:[1,5,9,10,11], karakas:["Sun","Jupiter"], method:"D5 is used as a focused confirmation of power and recognition through its Lagna, trines, 10th and the Sun; it does not replace D1 status combinations.", description: "Recognition, public authority, influence and power." },
+  marriage: { label: "Marriage", varga: "D9", houses: [1, 2, 7, 8], vargaHouses:[1,2,7,8,9,12], karakas:["Venus","Jupiter"], method:"D9 Lagna and 7th house/lord judge partnership; the 7th is also used as a spouse reference, with 2nd/8th continuity and 9th dharma.", description: "Partnership promise, harmony, durability and maturation." },
+  foreign: { label: "Foreign", varga: "D4", houses: [3,4,7,9,12], vargaHouses:[3,7,9,12], karakas:["Rahu","Moon"], supportingVargas:["D10","D9"], method:"D4 judges residence and fortune: 3rd shows leaving home, 7th/9th/12th and the D4 badhaka house show distance or foreign residence, with Rahu as the foreign-place indicator.", description: "Foreign movement, residence away from birthplace, work abroad and settlement." },
+  property: { label: "Property", varga: "D4", houses: [2, 4, 8, 11, 12], vargaHouses:[1,4,5,8,9,11,12], karakas:["Mars","Moon","Venus"], method:"D4 Lagna/Lagna lord and houses 4, 5 and 9 judge residence, property and fortune; 8 indicates abrupt change and 11/12 acquisition versus outlay.", description: "Land, residence, acquisition, ownership and expenditure." },
+  vehicles: { label: "Vehicles", varga: "D16", houses: [1, 4, 11], vargaHouses:[1,4,9,11,12], karakas:["Venus","Moon"], method:"D16 Lagna/Lagna lord, 4th house/lord, Venus and Moon specialize conveyances and comforts; 11/12 modify acquisition and loss/outlay.", description: "Vehicles, comforts, pleasures and visible material quality." },
+  gains: { label: "Gains", varga: "D11", houses: [2, 10, 11], vargaHouses:[1,2,10,11,12], karakas:["Jupiter","Mercury"], method:"D11 is treated as a gains/fulfilment confirmation through Lagna, houses 2, 10 and 11 and their lords; the selected D11 calculation profile is explicitly school-dependent.", description: "Income conversion, networks, fulfillment and retention." },
 });
 
 const DASHA_LORDS = Object.freeze(["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]);
@@ -43,6 +43,34 @@ function confirmationLabel(score) {
   if (score >= 68) return "Good";
   if (score >= 45) return "Moderate";
   return "Low";
+}
+
+const MOVABLE=new Set(["Aries","Cancer","Libra","Capricorn"]), FIXED=new Set(["Taurus","Leo","Scorpio","Aquarius"]);
+function badhakaHouse(ascSign){ return MOVABLE.has(ascSign)?11:FIXED.has(ascSign)?9:7; }
+function vargaDomainAnalysis(result,domain){
+  if(domain.key==="money") return evaluateHoraWealth(result,buildStructuralAnalysis(result));
+  const chart=result.charts[domain.varga]||result.charts.D1;
+  const focus=[...new Set(domain.vargaHouses||domain.houses)];
+  if(domain.key==="foreign") focus.push(badhakaHouse(chart.ascSign));
+  const houses=[...new Set(focus)].map((house)=>{
+    const lord=houseLord(chart,house), lordHouse=bodyHouse(chart,lord), occupants=rowByHouse(chart,house)?.bodies||[];
+    return {house,lord,lordHouse,occupants};
+  });
+  const lagnaLord=houseLord(chart,1),lagnaLordHouse=bodyHouse(chart,lagnaLord);
+  const karakas=(domain.karakas||[]).map((planet)=>({planet,house:bodyHouse(chart,planet),sign:bodySign(chart,planet)}));
+  const supportive=new Set([1,4,5,7,9,10,11]);
+  let points=houses.reduce((n,item)=>n+(item.occupants.length?1:0)+(supportive.has(item.lordHouse)?1:0),0);
+  points+=supportive.has(lagnaLordHouse)?2:0;
+  points+=karakas.filter((item)=>focus.includes(item.house)||supportive.has(item.house)).length;
+  if(domain.key==="foreign"){
+    const bh=badhakaHouse(chart.ascSign),rahuHouse=bodyHouse(chart,"Rahu"),bhLord=houseLord(chart,bh);
+    const foreignLink=[7,9,12,bh].includes(rahuHouse)||bodyHouse(chart,bhLord)===rahuHouse||bodyHouse(chart,houseLord(chart,7))===bh;
+    points+=foreignLink?4:0;
+  }
+  const max=Math.max(8,houses.length*2+2+karakas.length+4*(domain.key==="foreign"));
+  const score=Math.round(clamp(20+75*points/max,20,95));
+  return {score,label:confirmationLabel(score),chart:domain.varga,method:domain.method,lagna:chart.ascSign,lagnaLord,lagnaLordHouse,houses,karakas,badhaka:domain.key==="foreign"?{house:badhakaHouse(chart.ascSign),lord:houseLord(chart,badhakaHouse(chart.ascSign))}:null,
+    detail:`${domain.method} ${lagnaLord} rules ${domain.varga} Lagna and occupies H${lagnaLordHouse}; ${houses.filter((item)=>item.occupants.length).length} of ${houses.length} method-specific houses are occupied.`};
 }
 
 function evaluateHoraWealth(result, structural) {
@@ -75,11 +103,10 @@ function buildConfirmation(result, domain, structural, current, savAverage) {
     const placement = bodyHouse(d1, houseLord(d1, house));
     return [row.bodies.length > 0, positiveHouses.includes(placement)];
   });
-  const vargaHouses=domain.vargaHouses||domain.houses;
-  const vargaChecks = vargaHouses.map((house) => rowByHouse(varga, house)?.bodies.length > 0);
   const d1Score = Math.round(25 + 75 * d1Checks.filter(Boolean).length / d1Checks.length);
-  const hora=domain.key==="money"?evaluateHoraWealth(result,structural):null;
-  const vargaScore = hora?.score??Math.round(20 + 80 * vargaChecks.filter(Boolean).length / vargaChecks.length);
+  const vargaAnalysis=domain.key==="money"?evaluateHoraWealth(result,structural):vargaDomainAnalysis(result,domain);
+  const hora=domain.key==="money"?vargaAnalysis:null;
+  const vargaScore = vargaAnalysis.score;
   const avScore = Math.round(clamp(50 + (savAverage - structural.ashtakavarga.average) * 7, 20, 90));
   const relevantYogaTypes = ["money", "gains"].includes(domain.key) ? ["wealth"] : ["career", "fame", "overview"].includes(domain.key) ? ["status", "wealth"] : [];
   const yogaCount = structural.yogas.filter((yoga) => relevantYogaTypes.includes(yoga.type)).length;
@@ -90,19 +117,20 @@ function buildConfirmation(result, domain, structural, current, savAverage) {
   const activationCount = periodLords.reduce((count, lord) => {
     const planet = structural.planets[lord];
     if (!planet) return count;
-    const vargaHouse = bodyHouse(varga, lord);
-    return count + (domain.houses.includes(planet.house) ? 1 : 0) + (domain.houses.includes(vargaHouse) ? 1 : 0) + planet.housesOwned.filter((house) => domain.houses.includes(house)).length;
+    const vargaHouse = bodyHouse(varga, lord), owned=[];
+    for(let house=1;house<=12;house+=1) if(houseLord(varga,house)===lord) owned.push(house);
+    return count + (domain.houses.includes(planet.house) ? 1 : 0) + ((domain.vargaHouses||domain.houses).includes(vargaHouse) ? 1 : 0) + planet.housesOwned.filter((house) => domain.houses.includes(house)).length + owned.filter((house)=>(domain.vargaHouses||domain.houses).includes(house)).length;
   }, 0);
   const timingScore = current ? Math.round(clamp(25 + activationCount * 15, 20, 95)) : 25;
   const components = [
     { key:"d1", label:"D1 structural promise", chart:"D1", weight:CONFIRMATION_WEIGHTS.d1, score:d1Score, detail:`${d1Checks.filter(Boolean).length} of ${d1Checks.length} configured house/lord checks support the topic.` },
-    { key:"varga", label:`${domain.varga} divisional confirmation`, chart:domain.varga, weight:CONFIRMATION_WEIGHTS.varga, score:vargaScore, detail:hora?.detail??`${vargaChecks.filter(Boolean).length} of ${vargaChecks.length} topic houses are occupied in the relevant Varga.` },
+    { key:"varga", label:`${domain.varga} method-specific confirmation`, chart:domain.varga, weight:CONFIRMATION_WEIGHTS.varga, score:vargaScore, detail:vargaAnalysis.detail },
     { key:"ashtakavarga", label:"Ashtakavarga support", chart:"SAV", weight:CONFIRMATION_WEIGHTS.ashtakavarga, score:avScore, detail:`Topic-house SAV ${savAverage.toFixed(1)} versus chart average ${structural.ashtakavarga.average.toFixed(1)}.` },
     { key:"structure", label:"Lords, dignity & yogas", chart:"Structure", weight:CONFIRMATION_WEIGHTS.structure, score:structureScore, detail:`${conditionedLords} conditioned topic lords and ${yogaCount} relevant configured yogas.` },
     { key:"timing", label:"Current MD-AD activation", chart:"Timing", weight:CONFIRMATION_WEIGHTS.timing, score:timingScore, detail:current ? `${current.mdLord}-${current.adLord} produces ${activationCount} topic-house activations across ${domain.varga === "D1" ? "D1 placements and natal ownership" : `D1, ${domain.varga} and natal ownership`}.` : "No current MD-AD period was available." },
   ];
   const score = Math.round(components.reduce((sum, item) => sum + item.score * item.weight, 0) / 100);
-  return { score, label:confirmationLabel(score), components, hora, methodNote:"D1 governs promise. The relevant Varga and Ashtakavarga confirm it; MD-AD determines whether the promise is presently activated across D1 and the relevant division." };
+  return { score, label:confirmationLabel(score), components, hora, vargaAnalysis, methodNote:"D1 governs the natal promise. Each relevant Varga is then judged by its own Lagna, topic houses, lords and karakas; MD-AD activates those controllers but cannot manufacture an absent D1 promise." };
 }
 
 export function vimshottariTimeline(moonLongitude, birthDate, asOf = new Date()) {
@@ -151,11 +179,12 @@ function periodTheme(result, structural, period, asOf) {
     const activations=lords.reduce((sum,lord)=>{
       const planet=structural.planets[lord];
       if(!planet) return sum;
-      return sum+(spec.houses.includes(planet.house)?1:0)+(vargaHouses.includes(bodyHouse(varga,lord))?1:0)+planet.housesOwned.filter((house)=>spec.houses.includes(house)).length;
+      const owned=[]; for(let house=1;house<=12;house+=1) if(houseLord(varga,house)===lord) owned.push(house);
+      return sum+(spec.houses.includes(planet.house)?1:0)+(vargaHouses.includes(bodyHouse(varga,lord))?1:0)+planet.housesOwned.filter((house)=>spec.houses.includes(house)).length+owned.filter((house)=>vargaHouses.includes(house)).length+(spec.karakas?.includes(lord)?1:0);
     },0);
     const savValues=spec.houses.map((house)=>structural.ashtakavarga.sav[rowByHouse(d1,house).sign]);
     const savAverage=savValues.reduce((sum,value)=>sum+value,0)/savValues.length;
-    return {key,label:spec.label,varga:spec.varga,activations,savAverage:Number(savAverage.toFixed(1)),support:savAverage>=structural.ashtakavarga.average,rank:activations*2+(savAverage>=structural.ashtakavarga.average?1:0)};
+    return {key,label:spec.label,varga:spec.varga,method:spec.method,activations,savAverage:Number(savAverage.toFixed(1)),support:savAverage>=structural.ashtakavarga.average,rank:activations*2+(savAverage>=structural.ashtakavarga.average?1:0)};
   }).sort((a,b)=>b.rank-a.rank||b.activations-a.activations);
   const leaders=ranked.slice(0,3);
   const d60=lords.map((lord)=>({lord,...shashtiamsaAmsha(result.positions[lord].longitude)}));
@@ -208,9 +237,11 @@ export function evaluateDomain(result, key) {
       evidence.push({ tone: "caution", source: "P3/P5", title: `${lord} adds delivery friction`, detail: `House ${house} lord is placed in D1 house ${lordPlacement}; this is a modifier, not denial.` });
     }
   }
-  for (const house of spec.vargaHouses||spec.houses) {
-    const domainRow=rowByHouse(domain,house);
-    if(domainRow?.bodies.length) { support+=1; evidence.push({tone:"support",source:"P3",title:`${spec.varga} house ${house} is activated`,detail:domainRow.bodies.join(", ")}); }
+  const methodAnalysis=key==="money"?null:vargaDomainAnalysis(result,{key,...spec});
+  if(methodAnalysis){
+    support+=methodAnalysis.houses.filter((item)=>item.occupants.length).length;
+    evidence.push({tone:"support",source:"BPHS Ch. 7 + PVR Varga method",title:`${spec.varga} is read by its own rule set`,detail:methodAnalysis.detail});
+    methodAnalysis.houses.filter((item)=>item.occupants.length).slice(0,4).forEach((item)=>evidence.push({tone:"support",source:`${spec.varga} specialized frame`,title:`${spec.varga} H${item.house}: ${item.occupants.join(", ")}`,detail:`H${item.house} lord ${item.lord} occupies H${item.lordHouse} in ${spec.varga}.`}));
   }
   const confidence = Math.min(5, Math.max(1, Math.ceil((support + friction) / 3)));
   return {
@@ -222,6 +253,7 @@ export function evaluateDomain(result, key) {
       stability: qualitative(Math.max(0, support - Math.ceil(friction / 2))),
       confidence: ["", "Preliminary", "Developing", "Moderate", "Good", "High"][confidence],
     },
+    vargaMethod:methodAnalysis||{method:spec.method},
     evidence: evidence.slice(0, 12),
     limitations: "Shadbala, Bhavabala, Pratyantardasha and live transit triggers are not yet calculated; this result is structured confirmation, not a denial or certainty statement.",
   };
@@ -260,6 +292,22 @@ function buildForeignAnalysis(result,structural,current) {
     otherThemes:current?.theme?.domains?.slice(1)||[],
     d60:[...new Set([...Object.values(lords),...(current?[current.mdLord,current.adLord]:[])])].map((lord)=>({lord,...shashtiamsaAmsha(result.positions[lord].longitude)})),
   };
+}
+
+function buildForeignSpouseAnalysis(result,structural,current){
+  const d1=result.charts.D1,d9=result.charts.D9;
+  const spouseHouse=7, spouseLord=houseLord(d9,spouseHouse),spouseLordHouse=bodyHouse(d9,spouseLord);
+  const relativeHouse=(absolute)=>((absolute-spouseHouse+12)%12)+1;
+  const placements=["Rahu","Ketu",spouseLord,"Venus","Jupiter"].map((planet)=>({planet,house:bodyHouse(d9,planet),relative:relativeHouse(bodyHouse(d9,planet)),sign:bodySign(d9,planet)}));
+  const foreignRelative=[3,7,9,12], links=placements.filter((item)=>foreignRelative.includes(item.relative));
+  const d1SeventhLord=houseLord(d1,7),d1SeventhLordHouse=bodyHouse(d1,d1SeventhLord);
+  const d1Links=[7,9,12].includes(d1SeventhLordHouse)||[9,12].includes(bodyHouse(d1,"Rahu"));
+  const periodLords=current?[current.mdLord,current.adLord]:[];
+  const timing=periodLords.filter((lord)=>lord===spouseLord||[7,9,12].includes(bodyHouse(d9,lord))||houseLord(d9,7)===lord||houseLord(d9,9)===lord||houseLord(d9,12)===lord);
+  const score=(d1Links?2:0)+links.length+(timing.length?1:0);
+  return {level:score>=5?"Good":score>=2?"Moderate":"Low",spouseLord,spouseLordHouse,d1SeventhLord,d1SeventhLordHouse,placements,links,timing,
+    method:"D1 7th house/lord establishes spouse promise. D9 Lagna and 7th judge marriage; for origin/distance, the D9 7th is used as the spouse reference and its distance houses are treated only as confirmation, with Rahu and the D1 9th/12th axis.",
+    detail:`D9 7th lord ${spouseLord} is in D9 H${spouseLordHouse}. ${links.length} spouse-frame distance link(s) and ${d1Links?"a":"no direct"} D1 7L/Rahu link to H9/H12 are present.`};
 }
 
 function buildOverallPromises(result, structural, domains) {
@@ -322,6 +370,7 @@ export function buildPredictionReport(result, asOf = new Date()) {
     return [key,domain];
   }));
   const foreignAnalysis=buildForeignAnalysis(result,structural,current);
+  const foreignSpouseAnalysis=buildForeignSpouseAnalysis(result,structural,current);
   const overallPromises=buildOverallPromises(result,structural,domains);
   return {
     generatedFor: isoDay(asOf),
@@ -330,6 +379,7 @@ export function buildPredictionReport(result, asOf = new Date()) {
     timeline,
     currentPeriod: current || null,
     foreignAnalysis,
+    foreignSpouseAnalysis,
     overallPromises,
     readingOrder: [
       "Start with D1 structural promise and functional house lords.",
