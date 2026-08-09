@@ -285,6 +285,10 @@ function renderTimelineThemes() {
   document.querySelectorAll(".timeline-filters button").forEach((button)=>button.addEventListener("click",()=>{timelineView=button.dataset.view;renderTimelineThemes();}));
 }
 
+function setActiveInsightTab(key){
+  document.querySelectorAll(".insight-tab").forEach((tab)=>tab.setAttribute("aria-selected",String(tab.dataset.insight===key)));
+}
+
 function renderBestPeriods(){
   selectedInsight="best-periods";
   setActiveInsightTab("best-periods");
