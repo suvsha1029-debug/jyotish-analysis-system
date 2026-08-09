@@ -8,4 +8,11 @@ describe("prediction workspace UI wiring",()=>{
     expect(source).toMatch(/function\s+setActiveInsightTab\s*\(/);
     expect(source).toContain('setActiveInsightTab("best-periods")');
   });
+  it("wires separate but connected inheritance views",()=>{
+    expect(source).toMatch(/inheritance:\{label:"Inheritance"\}/);
+    expect(source).toMatch(/function\s+renderSpouseInheritance\s*\(/);
+    expect(source).toContain('key:"spouse-inheritance",label:"Spouse inheritance"');
+    expect(source).toContain("data-open-spouse-inheritance");
+    expect(source).toContain("data-open-marriage");
+  });
 });

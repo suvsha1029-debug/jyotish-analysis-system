@@ -9,7 +9,7 @@ const result = { ...built, utc:"2003-08-26T00:23:34.000Z" };
 
 describe("prediction domains", () => {
   it("defines the practical rulebook domains", () => {
-    expect(Object.keys(DOMAIN_SPECS)).toEqual(["overview","money","career","fame","marriage","foreign","property","vehicles","gains"]);
+    expect(Object.keys(DOMAIN_SPECS)).toEqual(["overview","money","career","fame","marriage","foreign","inheritance","property","vehicles","gains"]);
   });
   it.each(Object.keys(DOMAIN_SPECS))("builds traceable evidence for %s", (key) => {
     const report = evaluateDomain(result, key);
@@ -115,6 +115,30 @@ describe("Vimshottari timeline", () => {
     expect(report.foreignSpouseAnalysis.placements.map((item)=>item.planet)).toEqual(expect.arrayContaining(["Rahu","Ketu","Venus","Jupiter"]));
     expect(report.foreignSpouseAnalysis.method).toContain("D9 7th");
     expect(["Good","Moderate","Low"]).toContain(report.foreignSpouseAnalysis.level);
+  });
+  it("separates inheritance source, receipt, retention, dispute and asset type",()=>{
+    const report=buildPredictionReport(result,new Date("2026-08-08T00:00:00Z"));
+    const inheritance=report.inheritanceAnalysis;
+    expect(["Good","Moderate","Low"]).toContain(inheritance.promise.level);
+    expect(["Good","Moderate","Low"]).toContain(inheritance.receipt.level);
+    expect(["Good","Moderate","Low"]).toContain(inheritance.retention.level);
+    expect(["High","Moderate","Low"]).toContain(inheritance.dispute.level);
+    expect(inheritance.sources.map((item)=>item.key)).toEqual(["ancestral","paternal","maternal","spouse"]);
+    expect(inheritance.assetTypes.map((item)=>item.key)).toEqual(["cash","property","business"]);
+    expect(inheritance.lineageHouses.map((item)=>item.house)).toEqual([2,4,8,9,10,11]);
+    expect(inheritance.methodNote).toContain("D12 is used only for the native's parents");
+    expect(report.domains.inheritance.dimensions.promise).toBe(inheritance.promise.level);
+    expect(report.domains.inheritance.dimensions.stability).toBe(inheritance.retention.level);
+  });
+  it("keeps spouse personal inheritance distinct from benefit reaching the native",()=>{
+    const report=buildPredictionReport(result,new Date("2026-08-08T00:00:00Z"));
+    const spouse=report.spouseInheritanceAnalysis;
+    expect(spouse.nativeBenefit.detail).toContain("native D1 H8");
+    expect(spouse.spousePersonal.detail).toContain("derived indication");
+    expect(spouse.marriageSync.level).toBe(report.domains.marriage.confirmation.label);
+    expect(spouse.requiresSpouseChart).toBe(true);
+    expect(spouse.confidenceNote).toContain("spouse's verified birth chart");
+    expect(spouse.confidenceNote).toContain("D12");
   });
   it("ranks all Mahadashas with contextual combustion and cross-Varga evidence",()=>{
     const report=buildPredictionReport(result,new Date("2026-08-08T00:00:00Z"));

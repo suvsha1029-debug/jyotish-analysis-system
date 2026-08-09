@@ -14,6 +14,7 @@ export const DOMAIN_SPECS = Object.freeze({
   fame: { label: "Fame & authority", varga: "D5", houses: [1, 5, 9, 10, 11], vargaHouses:[1,5,9,10,11], karakas:["Sun","Jupiter"], method:"D5 is used as a focused confirmation of power and recognition through its Lagna, trines, 10th and the Sun; it does not replace D1 status combinations.", description: "Recognition, public authority, influence and power." },
   marriage: { label: "Marriage", varga: "D9", houses: [1, 2, 7, 8], vargaHouses:[1,2,7,8,9,12], karakas:["Venus","Jupiter"], method:"D9 Lagna and 7th house/lord judge partnership; the 7th is also used as a spouse reference, with 2nd/8th continuity and 9th dharma.", description: "Partnership promise, harmony, durability and maturation." },
   foreign: { label: "Foreign", varga: "D4", houses: [3,4,7,9,12], vargaHouses:[3,7,9,12], karakas:["Rahu","Moon"], supportingVargas:["D10","D9"], method:"D4 judges residence and fortune: 3rd shows leaving home, 7th/9th/12th and the D4 badhaka house show distance or foreign residence, with Rahu as the foreign-place indicator.", description: "Foreign movement, residence away from birthplace, work abroad and settlement." },
+  inheritance: { label: "Inheritance", varga: "D4", houses: [2, 4, 6, 8, 9, 10, 11, 12], vargaHouses:[1,2,4,6,8,9,11,12], karakas:["Sun","Moon","Jupiter"], supportingVargas:["D12","D2","D10"], method:"D1 H8 establishes inherited or shared assets; H2 and H11 separate retention and realization, while H6/H12 show dispute or leakage. D12 identifies the native's parental lineage, and D2, D4 or D10 confirms the asset type.", description: "Family, paternal, maternal and spouse-linked inheritance; receipt, retention, dispute and asset type are judged separately." },
   property: { label: "Property", varga: "D4", houses: [2, 4, 8, 11, 12], vargaHouses:[1,4,5,8,9,11,12], karakas:["Mars","Moon","Venus"], method:"D4 Lagna/Lagna lord and houses 4, 5 and 9 judge residence, property and fortune; 8 indicates abrupt change and 11/12 acquisition versus outlay.", description: "Land, residence, acquisition, ownership and expenditure." },
   vehicles: { label: "Vehicles", varga: "D16", houses: [1, 4, 11], vargaHouses:[1,4,9,11,12], karakas:["Venus","Moon"], method:"D16 Lagna/Lagna lord, 4th house/lord, Venus and Moon specialize conveyances and comforts; 11/12 modify acquisition and loss/outlay.", description: "Vehicles, comforts, pleasures and visible material quality." },
   gains: { label: "Gains", varga: "D11", houses: [2, 10, 11], vargaHouses:[1,2,10,11,12], karakas:["Jupiter","Mercury"], method:"D11 is treated as a gains/fulfilment confirmation through Lagna, houses 2, 10 and 11 and their lords; the selected D11 calculation profile is explicitly school-dependent.", description: "Income conversion, networks, fulfillment and retention." },
@@ -477,8 +478,115 @@ function buildForeignSpouseAnalysis(result,structural,current){
     detail:`D9 7th lord ${spouseLord} is in D9 H${spouseLordHouse}. ${links.length} spouse-frame distance link(s) and ${d1Links?"a":"no direct"} D1 7L/Rahu link to H9/H12 are present.`};
 }
 
+function buildInheritanceAnalysis(result,structural,current){
+  const d1=result.charts.D1,d2=result.charts.D2,d4=result.charts.D4,d10=result.charts.D10,d12=result.charts.D12;
+  const lords=Object.fromEntries([2,4,6,7,8,9,10,11,12].map((house)=>[house,houseLord(d1,house)]));
+  const connected=(first,second)=>{
+    if(first===second) return true;
+    const firstHouse=bodyHouse(d1,first),secondHouse=bodyHouse(d1,second);
+    return firstHouse===secondHouse||structural.aspects.some((aspect)=>(aspect.body===first&&aspect.toHouse===secondHouse)||(aspect.body===second&&aspect.toHouse===firstHouse));
+  };
+  const supportiveHouses=new Set([1,2,4,5,7,9,10,11]);
+  const strong=(planet)=>STRONG_DIGNITIES.has(structural.planets[planet]?.dignity)||structural.planets[planet]?.dignity==="Friendly sign";
+  const sav=(house)=>structural.ashtakavarga.sav[rowByHouse(d1,house).sign];
+  const avAverage=structural.ashtakavarga.average;
+  const level=(points,good=5,moderate=2)=>points>=good?"Good":points>=moderate?"Moderate":"Low";
+  const chartSupport=(chart,houses)=>houses.reduce((score,house)=>{
+    const lord=houseLord(chart,house),placement=bodyHouse(chart,lord);
+    return score+(rowByHouse(chart,house).bodies.length?1:0)+(supportiveHouses.has(placement)?1:0);
+  },0);
+
+  const eighthLord=lords[8],eighthLordHouse=bodyHouse(d1,eighthLord);
+  let promisePoints=(rowByHouse(d1,8).bodies.length?1:0)+(strong(eighthLord)?2:0)+(supportiveHouses.has(eighthLordHouse)?1:0)+(sav(8)>=avAverage?1:0);
+  if(connected(eighthLord,lords[2])) promisePoints+=2;
+  if(connected(eighthLord,lords[11])) promisePoints+=2;
+
+  let receiptPoints=(connected(eighthLord,lords[11])?3:0)+(connected(eighthLord,lords[2])?2:0)+(rowByHouse(d1,11).bodies.length?1:0)+(supportiveHouses.has(bodyHouse(d1,lords[11]))?1:0)+(sav(11)>=avAverage?1:0);
+  let retentionPoints=(strong(lords[2])?2:0)+(supportiveHouses.has(bodyHouse(d1,lords[2]))?2:0)+(sav(2)>=avAverage?1:0)+(connected(lords[2],lords[11])?1:0);
+  const leakageLinks=[connected(lords[2],lords[12]),connected(eighthLord,lords[12])].filter(Boolean).length;
+  retentionPoints-=leakageLinks;
+
+  const disputePoints=(rowByHouse(d1,6).bodies.length?1:0)+(connected(eighthLord,lords[6])?2:0)+(connected(lords[4],lords[6])?1:0)+(connected(lords[2],lords[12])?1:0)+["Mars","Saturn","Rahu","Ketu"].filter((planet)=>[6,8,12].includes(bodyHouse(d1,planet))).length;
+  const disputeRisk=disputePoints>=5?"High":disputePoints>=2?"Moderate":"Low";
+
+  const source=(key,label,points,evidence,frame)=>({key,label,level:level(points,5,2),evidence,frame});
+  const paternalPoints=(connected(eighthLord,lords[9])?2:0)+(connected(eighthLord,lords[10])?2:0)+([2,8,11].includes(bodyHouse(d1,"Sun"))?1:0)+chartSupport(d12,[9,10]);
+  const maternalPoints=(connected(eighthLord,lords[4])?3:0)+([2,8,11].includes(bodyHouse(d1,"Moon"))?1:0)+chartSupport(d12,[2,4]);
+  const ancestralPoints=(connected(eighthLord,lords[2])?2:0)+(connected(eighthLord,lords[9])?2:0)+chartSupport(d12,[2,8,9]);
+  const spousePoints=(connected(lords[7],eighthLord)?2:0)+(rowByHouse(d1,8).bodies.length?1:0)+chartSupport(result.charts.D9,[2,8]);
+  const sources=[
+    source("ancestral","Family / ancestral",ancestralPoints,[`D1 H8 lord ${eighthLord} ${connected(eighthLord,lords[2])?"connects":"does not directly connect"} with H2 lord ${lords[2]}.`,`D12 H2/H8/H9 support is ${level(chartSupport(d12,[2,8,9]),4,2).toLowerCase()}.`],"D1 H2-H8-H9, confirmed through the native's D12"),
+    source("paternal","Paternal / patrimony",paternalPoints,[`D1 H9 lord ${lords[9]} and H10 lord ${lords[10]} are checked against H8 lord ${eighthLord}.`,`Sun occupies D1 H${bodyHouse(d1,"Sun")}; D12 H9/H10 are the paternal-line confirmation frame.`],"D1 H8 with H9/H10 and Sun; D12 confirms the native's paternal lineage"),
+    source("maternal","Maternal",maternalPoints,[`D1 H4 lord ${lords[4]} ${connected(eighthLord,lords[4])?"connects":"does not directly connect"} with H8 lord ${eighthLord}.`,`Moon occupies D1 H${bodyHouse(d1,"Moon")}; D12 H2/H4 are the maternal-resource frame.`],"D1 H4-H8 and Moon; D12 confirms the native's maternal lineage"),
+    source("spouse","Spouse-family linked",spousePoints,[`Native H8 is the derived H2 from the spouse reference; H7 lord ${lords[7]} ${connected(lords[7],eighthLord)?"connects":"does not directly connect"} with H8 lord ${eighthLord}.`,`D9 H2/H8 add relationship-channel confirmation, not ownership proof.`],"D1 H7/H8, with D9 spouse-frame confirmation"),
+  ];
+
+  const asset=(key,label,points,chart,detail)=>({key,label,level:level(points,6,3),chart,detail});
+  const assetTypes=[
+    asset("cash","Cash / liquid wealth",receiptPoints+chartSupport(d2,[1,2,11]),"D1 + D2","H8 is routed through H2/H11, then D2 evaluates liquid-wealth delivery."),
+    asset("property","Land / residence",(connected(eighthLord,lords[4])?3:0)+chartSupport(d4,[1,2,4,8,9,11]),"D1 + D4","H8 must connect with property controllers; D4 confirms land, residence and transfer conditions."),
+    asset("business","Family business / professional mantle",(connected(eighthLord,lords[10])?3:0)+chartSupport(d10,[1,2,8,10,11]),"D1 + D10","H8 and H10 identify inherited responsibility or enterprise; D10 confirms the professional channel."),
+  ];
+
+  const lineageHouses=[2,4,8,9,10,11].map((house)=>({house,lord:houseLord(d12,house),lordHouse:bodyHouse(d12,houseLord(d12,house)),occupants:rowByHouse(d12,house).bodies}));
+  const controllerGroups={inheritance:[eighthLord],receipt:[lords[2],lords[11]],source:[lords[4],lords[9],lords[10]],dispute:[lords[6],lords[12]]};
+  const allControllers=[...new Set(Object.values(controllerGroups).flat())];
+  const periodLords=current?[current.mdLord,current.adLord]:[];
+  const activeControllers=periodLords.filter((lord)=>allControllers.includes(lord));
+  const axis=current?assessMdAdAxis(current.geometry):null;
+  const timingLevel=!current?"Low":axis.pair==="6/8"?"Low":axis.pair==="2/12"?"Moderate":activeControllers.length>=2?"Good":activeControllers.length?"Moderate":"Low";
+
+  return {
+    promise:{level:level(promisePoints,7,3),detail:`D1 H8 and its lord establish availability; H2/H11 links determine whether inherited value can become retained wealth.`},
+    receipt:{level:level(receiptPoints,6,3),detail:`Realization is read from H8 to H11 and H2. H11 lord ${lords[11]} is in H${bodyHouse(d1,lords[11])}.`},
+    retention:{level:level(retentionPoints,5,2),detail:`Retention is judged separately through H2, its lord and H12 leakage. ${leakageLinks} configured leakage link(s) are present.`},
+    dispute:{level:disputeRisk,detail:`H6, H12, malefic pressure and their links to H8/property controllers produce ${disputeRisk.toLowerCase()} configured dispute friction.`},
+    sources,assetTypes,lineageHouses,controllers:controllerGroups,
+    timing:{level:timingLevel,mdLord:current?.mdLord||null,adLord:current?.adLord||null,axis:current?.geometry||null,axisAssessment:axis,activeControllers,detail:!current?"No current MD-AD period is available.":`${current.mdLord}-${current.adLord} activates ${activeControllers.length?activeControllers.join(" and "):"no direct inheritance controller"}. Material activation and ease are separate: ${axis.detail}`},
+    nodeModifiers:structural.nodes.filter((node)=>[2,6,8,11,12].includes(node.house)).map((node)=>({node:node.node,house:node.house,sign:node.sign,controller:node.signDispositor,detail:`${node.node} is treated through ${node.signDispositor} and ${node.nakshatraLord}; it modifies the inheritance route but cannot promise an event alone.`})),
+    d60Reliability:d60Reliability(result),
+    methodNote:"This model deliberately separates promise, source, asset type, receipt, retention, dispute and timing. D12 is used only for the native's parents. SAV confirms house support; it does not replace lordship. D60 is excluded unless the birth-time stability audit passes.",
+  };
+}
+
+function buildSpouseInheritanceAnalysis(result,structural,current,marriageDomain,inheritance){
+  const d1=result.charts.D1,d9=result.charts.D9,d4=result.charts.D4;
+  const level=(points,good=5,moderate=2)=>points>=good?"Good":points>=moderate?"Moderate":"Low";
+  const connected=(first,second)=>{
+    if(first===second) return true;
+    const firstHouse=bodyHouse(d1,first),secondHouse=bodyHouse(d1,second);
+    return firstHouse===secondHouse||structural.aspects.some((aspect)=>(aspect.body===first&&aspect.toHouse===secondHouse)||(aspect.body===second&&aspect.toHouse===firstHouse));
+  };
+  const d1Lords={second:houseLord(d1,2),seventh:houseLord(d1,7),eighth:houseLord(d1,8),eleventh:houseLord(d1,11)};
+  const d9Lords={seventh:houseLord(d9,7),spouseWealth:houseLord(d9,8),spouseInheritance:houseLord(d9,2)};
+  const d9Support=(houses)=>houses.reduce((score,house)=>score+(rowByHouse(d9,house).bodies.length?1:0)+([1,4,5,7,9,10,11].includes(bodyHouse(d9,houseLord(d9,house)))?1:0),0);
+  const d4Support=[4,8,11].reduce((score,house)=>score+(rowByHouse(d4,house).bodies.length?1:0)+([1,4,5,7,9,10,11].includes(bodyHouse(d4,houseLord(d4,house)))?1:0),0);
+  const nativeBenefitPoints=(connected(d1Lords.seventh,d1Lords.eighth)?2:0)+(connected(d1Lords.eighth,d1Lords.second)?2:0)+(connected(d1Lords.eighth,d1Lords.eleventh)?2:0)+d9Support([7,8]);
+  const spousePersonalPoints=(rowByHouse(d1,2).bodies.length?1:0)+([1,2,5,9,10,11].includes(bodyHouse(d1,d1Lords.second))?1:0)+d9Support([2]);
+  const propertyPoints=(connected(d1Lords.eighth,houseLord(d1,4))?2:0)+d4Support;
+  const timingControllers=[...new Set([...Object.values(d1Lords),...Object.values(d9Lords),houseLord(d4,4),houseLord(d4,8),houseLord(d4,11)])];
+  const activeControllers=(current?[current.mdLord,current.adLord]:[]).filter((lord)=>timingControllers.includes(lord));
+  const axis=current?assessMdAdAxis(current.geometry):null;
+  return {
+    nativeBenefit:{level:level(nativeBenefitPoints,7,3),detail:"Resources reaching the native through the spouse-family channel are read from native D1 H8 (the spouse's derived H2), then H2/H11 test realization and retention."},
+    spousePersonal:{level:level(spousePersonalPoints,5,2),detail:"The spouse's personal inheritance is only a derived indication here: native D1 H2 is the spouse's derived H8, and D9 H2 repeats that spouse-reference route."},
+    householdProperty:{level:level(propertyPoints,6,3),detail:"D4 H4/H8/H11 checks whether a spouse-linked resource is more likely to integrate as household property rather than remain a personal asset."},
+    marriageSync:{level:marriageDomain.confirmation.label,ul:structural.arudhas.UL,d1SeventhLord:d1Lords.seventh,d9SeventhLord:d9Lords.seventh,detail:`Marriage promise remains the gate: D1 H7 lord ${d1Lords.seventh}, D9 H7 lord ${d9Lords.seventh} and Upapada are read before spouse-resource indications.`},
+    routes:[
+      {label:"Spouse-family resources reaching native",houses:"D1 H7 -> H8 -> H11/H2",detail:"Shows the channel, realization and retention in the native's life."},
+      {label:"Spouse's own inheritance",houses:"Derived D1 H2 + D9 H2",detail:"This is not automatically the native's asset and cannot be confirmed without the spouse's own chart."},
+      {label:"Shared property integration",houses:"D1 H4/H8 + D4 H4/H8/H11",detail:"Separates property transfer or shared residence from liquid inheritance."},
+    ],
+    controllers:{d1:d1Lords,d9:d9Lords,timing:timingControllers},
+    timing:{level:!current?"Low":axis.pair==="6/8"?"Low":activeControllers.length>=2?"Good":activeControllers.length?"Moderate":"Low",mdLord:current?.mdLord||null,adLord:current?.adLord||null,axis:current?.geometry||null,activeControllers,detail:!current?"No current MD-AD period is available.":`${current.mdLord}-${current.adLord} activates ${activeControllers.length?activeControllers.join(" and "):"no direct spouse-resource controller"}. ${axis.detail}`},
+    inheritedNativeContext:{promise:inheritance.promise.level,receipt:inheritance.receipt.level,retention:inheritance.retention.level},
+    requiresSpouseChart:true,
+    confidenceNote:"A native chart can show spouse-linked resources and household impact, but it cannot reliably identify or guarantee what the spouse personally inherits. Use the spouse's verified birth chart for that claim; the native's D12 must not be used for the spouse's parents.",
+  };
+}
+
 function buildOverallPromises(result, structural, domains) {
-  const arudhaMap={overview:"AL",money:"A2",career:"A10",fame:"AL",marriage:"UL",foreign:"A9",property:"A4",vehicles:"A4",gains:"A11"};
+  const arudhaMap={overview:"AL",money:"A2",career:"A10",fame:"AL",marriage:"UL",foreign:"A9",inheritance:"A8",property:"A4",vehicles:"A4",gains:"A11"};
   const rows=Object.values(domains).map((domain)=>{
     const natal=domain.confirmation.components.filter((item)=>item.key!=="timing");
     const totalWeight=natal.reduce((sum,item)=>sum+item.weight,0);
@@ -496,7 +604,7 @@ function buildOverallPromises(result, structural, domains) {
   return {
     overall,counts,rows,
     specialPoints:[
-      ...Object.entries(structural.arudhas).filter(([key])=>["AL","A2","A4","A9","A10","A11","UL"].includes(key)).map(([key,value])=>({key,...value,type:"Arudha"})),
+      ...Object.entries(structural.arudhas).filter(([key])=>["AL","A2","A4","A8","A9","A10","A11","UL"].includes(key)).map(([key,value])=>({key,...value,type:"Arudha"})),
       ...Object.entries(structural.specialLagnas||{}).map(([key,value])=>({key:key.replace(/([A-Z])/g," $1").replace(/^./,(c)=>c.toUpperCase()),house:null,...value,type:"Sunrise-derived"})),
     ],
     nodes:structural.nodes,
@@ -545,6 +653,24 @@ export function buildPredictionReport(result, asOf = new Date()) {
   const foreignAnalysis=buildForeignAnalysis(result,structural,current);
   const foreignPropertyAnalysis=buildForeignPropertyAnalysis(result,structural,current);
   const foreignSpouseAnalysis=buildForeignSpouseAnalysis(result,structural,current);
+  const inheritanceAnalysis=buildInheritanceAnalysis(result,structural,current);
+  const spouseInheritanceAnalysis=buildSpouseInheritanceAnalysis(result,structural,current,domains.marriage,inheritanceAnalysis);
+  const inheritanceDomain=domains.inheritance;
+  const labelScore={Good:78,Moderate:52,Low:28,High:25};
+  const inheritanceComponentScores={
+    d1:labelScore[inheritanceAnalysis.promise.level],
+    varga:Math.max(...inheritanceAnalysis.assetTypes.map((item)=>labelScore[item.level])),
+    structure:Math.round((labelScore[inheritanceAnalysis.receipt.level]+labelScore[inheritanceAnalysis.retention.level]+(inheritanceAnalysis.dispute.level==="Low"?80:inheritanceAnalysis.dispute.level==="Moderate"?52:25))/3),
+  };
+  inheritanceDomain.confirmation.components=inheritanceDomain.confirmation.components.map((item)=>{
+    if(item.key==="d1") return {...item,score:inheritanceComponentScores.d1,detail:inheritanceAnalysis.promise.detail};
+    if(item.key==="varga") return {...item,score:inheritanceComponentScores.varga,detail:`Asset-specific confirmation: ${inheritanceAnalysis.assetTypes.map((asset)=>`${asset.label} ${asset.level}`).join("; ")}.`};
+    if(item.key==="structure") return {...item,score:inheritanceComponentScores.structure,detail:`Receipt ${inheritanceAnalysis.receipt.level}; retention ${inheritanceAnalysis.retention.level}; dispute risk ${inheritanceAnalysis.dispute.level}.`};
+    return item;
+  });
+  inheritanceDomain.confirmation.score=Math.round(inheritanceDomain.confirmation.components.reduce((sum,item)=>sum+item.score*item.weight,0)/100);
+  inheritanceDomain.confirmation.label=confirmationLabel(inheritanceDomain.confirmation.score);
+  inheritanceDomain.dimensions={...inheritanceDomain.dimensions,promise:inheritanceAnalysis.promise.level,strength:inheritanceAnalysis.receipt.level,ease:inheritanceAnalysis.dispute.level==="Low"?"Good":inheritanceAnalysis.dispute.level==="Moderate"?"Moderate":"Low",stability:inheritanceAnalysis.retention.level};
   const overallPromises=buildOverallPromises(result,structural,domains);
   const mahadashaRankings=buildMahadashaRankings(result,structural,timeline);
   return {
@@ -556,6 +682,8 @@ export function buildPredictionReport(result, asOf = new Date()) {
     foreignAnalysis,
     foreignPropertyAnalysis,
     foreignSpouseAnalysis,
+    inheritanceAnalysis,
+    spouseInheritanceAnalysis,
     overallPromises,
     mahadashaRankings,
     readingOrder: [
