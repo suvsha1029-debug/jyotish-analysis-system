@@ -136,16 +136,19 @@ function buildConfirmation(result, domain, structural, current, savAverage) {
     for(let house=1;house<=12;house+=1) if(houseLord(varga,house)===lord) owned.push(house);
     return count + (domain.houses.includes(planet.house) ? 1 : 0) + ((domain.vargaHouses||domain.houses).includes(vargaHouse) ? 1 : 0) + planet.housesOwned.filter((house) => domain.houses.includes(house)).length + owned.filter((house)=>(domain.vargaHouses||domain.houses).includes(house)).length;
   }, 0);
-  const timingScore = current ? Math.round(clamp(25 + activationCount * 15, 20, 95)) : 25;
+  const activationScore=current?Math.round(clamp(20+activationCount*12,20,95)):20;
+  const axisAssessment=current?assessMdAdAxis(current.geometry):null;
+  const timingJudgment=current?combineTimingJudgment(axisAssessment,activationScore):{score:25,label:"Low",raw:25,capped:false,axisWeight:MD_AD_AXIS_WEIGHT,activationWeight:100-MD_AD_AXIS_WEIGHT};
+  const timingScore=timingJudgment.score;
   const components = [
     { key:"d1", label:"D1 structural promise", chart:"D1", weight:CONFIRMATION_WEIGHTS.d1, score:d1Score, detail:`${d1Checks.filter(Boolean).length} of ${d1Checks.length} configured house/lord checks support the topic.` },
     { key:"varga", label:`${domain.varga} method-specific confirmation`, chart:domain.varga, weight:CONFIRMATION_WEIGHTS.varga, score:vargaScore, detail:vargaAnalysis.detail },
     { key:"ashtakavarga", label:"Ashtakavarga support", chart:"SAV", weight:CONFIRMATION_WEIGHTS.ashtakavarga, score:avScore, detail:`Topic-house SAV ${savAverage.toFixed(1)} versus chart average ${structural.ashtakavarga.average.toFixed(1)}.` },
     { key:"structure", label:"Lords, dignity & yogas", chart:"Structure", weight:CONFIRMATION_WEIGHTS.structure, score:structureScore, detail:`${conditionedLords} conditioned topic lords and ${yogaCount} relevant configured yogas.` },
-    { key:"timing", label:"Current MD-AD activation", chart:"Timing", weight:CONFIRMATION_WEIGHTS.timing, score:timingScore, detail:current ? `${current.mdLord}-${current.adLord} produces ${activationCount} topic-house activations across ${domain.varga === "D1" ? "D1 placements and natal ownership" : `D1, ${domain.varga} and natal ownership`}.` : "No current MD-AD period was available." },
+    { key:"timing", label:"Current MD-AD axis and activation", chart:"Timing", weight:CONFIRMATION_WEIGHTS.timing, score:timingScore, detail:current ? `${current.mdLord}-${current.adLord} is a ${axisAssessment.pair} axis (${axisAssessment.tone}). The axis contributes ${MD_AD_AXIS_WEIGHT}% of this timing grade and ${activationCount} topic-house activations contribute ${100-MD_AD_AXIS_WEIGHT}%. ${axisAssessment.detail}${timingJudgment.capped?` Delivery is capped at ${timingJudgment.label}.`:""}` : "No current MD-AD period was available." },
   ];
   const score = Math.round(components.reduce((sum, item) => sum + item.score * item.weight, 0) / 100);
-  return { score, label:confirmationLabel(score), components, hora, vargaAnalysis, methodNote:"D1 governs the natal promise. Each relevant Varga is then judged by its own Lagna, topic houses, lords and karakas; MD-AD activates those controllers but cannot manufacture an absent D1 promise." };
+  return { score, label:confirmationLabel(score), components, hora, vargaAnalysis, timingJudgment, methodNote:"D1 governs the natal promise. Each relevant Varga is then judged by its own Lagna, topic houses, lords and karakas; within timing, the MD-AD placement axis controls 65% and activation/support controls 35%. MD-AD cannot manufacture an absent D1 promise." };
 }
 
 export function vimshottariTimeline(moonLongitude, birthDate, asOf = new Date()) {
@@ -187,7 +190,30 @@ function periodGeometry(d1, mdLord, adLord) {
   return { mdHouse, adHouse, pair, relation };
 }
 
-function periodTheme(result, structural, period, asOf) {
+export const MD_AD_AXIS_WEIGHT = 65;
+
+export function assessMdAdAxis(geometry) {
+  const pair = geometry?.pair;
+  const rules = {
+    "6/8": { score:15, cap:39, level:"Low", tone:"Severe friction", detail:"The period lords occupy a 6-8 relationship. Conflict, obstruction, adjustment and uneven delivery dominate even when the individual lords are otherwise strong." },
+    "2/12": { score:34, cap:54, level:"Low", tone:"Loss / transition", detail:"The period lords occupy a 2-12 relationship. Expenditure, separation, transition or leakage can outweigh apparent strength unless the promised topic specifically requires those themes." },
+    "7/7": { score:52, cap:64, level:"Moderate", tone:"Opposition / negotiation", detail:"The period lords oppose one another. Results depend on negotiation, counterparties and the ability to reconcile competing agendas." },
+    "4/10": { score:76, cap:95, level:"Good", tone:"Constructive action axis", detail:"The period lords form a 4-10 relationship, supporting concrete action and restructuring when the natal promise agrees." },
+    "5/9": { score:88, cap:95, level:"Good", tone:"Trinal cooperation", detail:"The period lords form a 5-9 relationship, allowing their agendas to cooperate and reinforce promised results." },
+    "3/11": { score:78, cap:95, level:"Good", tone:"Effort-to-gain axis", detail:"The period lords form a 3-11 relationship, favouring results through effort, initiative, networks and fulfilment." },
+    "1/1": { score:72, cap:90, level:"Good", tone:"Concentrated agenda", detail:"The period lords occupy the same house, concentrating delivery; conjunction quality and the shared house still modify the outcome." },
+  };
+  const rule=rules[pair]||{score:50,cap:70,level:"Moderate",tone:"Controller-dependent",detail:"No standard placement-axis rule is available, so dispositors, ownership and associations control the timing judgment."};
+  return {...rule,pair:pair||"Controller route",weight:MD_AD_AXIS_WEIGHT};
+}
+
+function combineTimingJudgment(axisAssessment, activationScore) {
+  const raw=Math.round(axisAssessment.score*(MD_AD_AXIS_WEIGHT/100)+activationScore*((100-MD_AD_AXIS_WEIGHT)/100));
+  const score=Math.min(axisAssessment.cap,clamp(raw,15,95));
+  return {score,label:confirmationLabel(score),raw,capped:score<raw,axisWeight:MD_AD_AXIS_WEIGHT,activationWeight:100-MD_AD_AXIS_WEIGHT};
+}
+
+function periodTheme(result, structural, period, asOf, geometry=periodGeometry(result.charts.D1,period.mdLord,period.adLord)) {
   const d1=result.charts.D1;
   const lords=[period.mdLord,period.adLord];
   const ranked=Object.entries(DOMAIN_SPECS).map(([key,spec])=>{
@@ -208,7 +234,10 @@ function periodTheme(result, structural, period, asOf) {
   const activationTotal=leaders[0].activations+leaders[1].activations;
   const supportCount=leaders.slice(0,2).filter((item)=>item.support).length;
   const beneficAmshas=d60.filter((item)=>item.rawNature==="Benefic").length;
-  const delivery=activationTotal>=7&&supportCount>=1?"Good":activationTotal>=3?"Moderate":"Low";
+  const activationScore=Math.round(clamp(20+activationTotal*7+supportCount*6,20,95));
+  const axisAssessment=assessMdAdAxis(geometry);
+  const timingJudgment=combineTimingJudgment(axisAssessment,activationScore);
+  const delivery=timingJudgment.label;
   const directD1Load=lords.map((lord)=>{
     const planet=structural.planets[lord];
     return {lord,house:planet?.house,housesOwned:planet?.housesOwned||[],aspectedHouses:structural.aspects.filter((aspect)=>aspect.body===lord).map((aspect)=>aspect.toHouse)};
@@ -223,11 +252,11 @@ function periodTheme(result, structural, period, asOf) {
   const start=new Date(`${period.start}T00:00:00Z`),end=new Date(`${period.end}T00:00:00Z`);
   const phase=period.current?"current":end<asOf?"past":"upcoming";
   return {
-    phase,delivery,
+    phase,delivery,axisAssessment,timingJudgment,activationScore,
     headline:`${leaders[0].label} and ${leaders[1].label}`,
     domains:leaders,
     d60,d60Reliability:d60Status,directD1Load,activatedHouses,nodeControllers,
-    summary:`${period.mdLord} sets the period environment and ${period.adLord} executes it. Direct D1 load: ${d1LoadText}.${controllerText} ${leaders[0].label} is the strongest specialist-chart activation (${leaders[0].varga}); its house SAV is ${leaders[0].support?"supportive":"below the chart average"}. ${d60Status.reliable?`${beneficAmshas} of the 2 period lords occupy benefic D60 amshas.`:`D60 is excluded from this judgment: ${d60Status.reason}`}`,
+    summary:`MD-AD axis ${axisAssessment.pair} (${axisAssessment.tone}) controls ${MD_AD_AXIS_WEIGHT}% of the timing grade; topic activation controls ${100-MD_AD_AXIS_WEIGHT}%. ${axisAssessment.detail}${timingJudgment.capped?` The ${axisAssessment.pair} rule caps this period at ${timingJudgment.label}.`:""} ${period.mdLord} sets the period environment and ${period.adLord} executes it. Direct D1 load: ${d1LoadText}.${controllerText} ${leaders[0].label} is the strongest specialist-chart activation (${leaders[0].varga}); its house SAV is ${leaders[0].support?"supportive":"below the chart average"}. ${d60Status.reliable?`${beneficAmshas} of the 2 period lords occupy benefic D60 amshas.`:`D60 is excluded from this judgment: ${d60Status.reason}`}`,
   };
 }
 
@@ -489,7 +518,10 @@ export function buildPredictionReport(result, asOf = new Date()) {
   const structural = buildStructuralAnalysis(result);
   const birthDate = new Date(result.utc);
   const timeline = vimshottariTimeline(result.positions.Moon.longitude, birthDate, asOf);
-  timeline.periods = timeline.periods.map((period) => ({ ...period, geometry: periodGeometry(result.charts.D1, period.mdLord, period.adLord), theme:periodTheme(result,structural,period,asOf) }));
+  timeline.periods = timeline.periods.map((period) => {
+    const geometry=periodGeometry(result.charts.D1,period.mdLord,period.adLord);
+    return {...period,geometry,theme:periodTheme(result,structural,period,asOf,geometry)};
+  });
   const current = timeline.periods.find((period) => period.current);
   const domains = Object.fromEntries(Object.keys(DOMAIN_SPECS).map((key) => {
     const domain = evaluateDomain(result, key);

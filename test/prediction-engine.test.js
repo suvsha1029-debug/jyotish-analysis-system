@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCharts } from "../src/varga-engine.js";
-import { CONFIRMATION_WEIGHTS, DOMAIN_SPECS, buildPredictionReport, evaluateDomain, vimshottariTimeline } from "../src/prediction-engine.js";
+import { CONFIRMATION_WEIGHTS, DOMAIN_SPECS, MD_AD_AXIS_WEIGHT, assessMdAdAxis, buildPredictionReport, evaluateDomain, vimshottariTimeline } from "../src/prediction-engine.js";
 
 const longitudes = { Sun:128.47, Moon:106.84, Mars:311.84, Mercury:152.11, Jupiter:125.79, Venus:130.47, Saturn:76.15, Rahu:30.57, Ketu:210.57, Asc:125.84 };
 const positions = Object.fromEntries(Object.entries(longitudes).map(([name, longitude]) => [name, { longitude, retrograde:name === "Mars" }]));
@@ -46,6 +46,19 @@ describe("Vimshottari timeline", () => {
     expect(report.timeline.periods.some((period) => period.theme.phase === "past")).toBe(true);
     expect(report.timeline.periods.some((period) => period.theme.phase === "upcoming")).toBe(true);
     expect(report.readingOrder).toHaveLength(6);
+  });
+  it("gives the MD-AD axis primary authority and hard-caps a 6/8 delivery",()=>{
+    const severe=assessMdAdAxis({pair:"6/8"});
+    const supportive=assessMdAdAxis({pair:"5/9"});
+    expect(MD_AD_AXIS_WEIGHT).toBe(65);
+    expect(severe.cap).toBeLessThan(45);
+    expect(severe.score).toBeLessThan(supportive.score);
+    const report=buildPredictionReport(result,new Date("2026-08-08T00:00:00Z"));
+    const sixEight=report.timeline.periods.filter((period)=>period.geometry.pair==="6/8");
+    expect(sixEight.length).toBeGreaterThan(0);
+    expect(sixEight.every((period)=>period.theme.delivery==="Low")).toBe(true);
+    expect(sixEight.every((period)=>period.theme.timingJudgment.axisWeight===65)).toBe(true);
+    expect(sixEight.every((period)=>period.theme.summary.includes("controls 65%"))).toBe(true);
   });
   it("separates foreign-property promise, acquisition, fortune and residence stability",()=>{
     const report=buildPredictionReport(result,new Date("2026-08-08T00:00:00Z"));
