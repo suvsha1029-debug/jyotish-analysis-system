@@ -150,9 +150,10 @@ export function analyzeNodes(result) {
 
 export function buildStructuralAnalysis(result) {
   const ashtakavarga=calculateAshtakavarga(result.positions), aspects=calculateAspects(result);
+  const specialLagnas=result.panchanga?.specialLagnas ? Object.fromEntries(Object.entries(result.panchanga.specialLagnas).filter(([,value])=>Number.isFinite(value)).map(([key,longitude])=>[key,{longitude,sign:SIGNS[Math.floor(longitude/30)],degree:Number((longitude%30).toFixed(4))}])) : {};
   return {
     planets:Object.fromEntries(Object.keys(result.positions).map((body)=>[body,{house:d1House(result,body),sign:SIGNS[signFor(result,body)],dignity:dignityFor(body,result.positions[body].longitude),housesOwned:lordHouses(result,body),functional:functionalNature(result,body),debilitation:debilitationCancellation(result,body),dispositor:dispositorChain(result,body)}])),
-    ashtakavarga, aspects, arudhas:calculateArudhas(result), yogas:detectYogas(result,aspects), nodes:analyzeNodes(result),
-    unavailable:["Hora Lagna (needs verified sunrise)","Ghati Lagna (needs verified sunrise)","Shadbala/Bhavabala","Live transit trigger"],
+    ashtakavarga, aspects, arudhas:calculateArudhas(result), specialLagnas, yogas:detectYogas(result,aspects), nodes:analyzeNodes(result),
+    unavailable:[...(result.panchanga?.specialLagnas?[]:["Bhava/Hora/Ghati Lagna (needs verified sunrise)"]),"Shadbala/Bhavabala","Live transit trigger"],
   };
 }

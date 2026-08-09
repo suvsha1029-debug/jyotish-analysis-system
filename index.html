@@ -65,6 +65,7 @@
         <div class="field"><label for="utcOffset">UTC offset</label><input id="utcOffset" name="utcOffset" placeholder="+05:30" pattern="[+-][0-9]{2}:[0-9]{2}" required><small id="timezone-label">Select birthplace</small></div>
         <div class="field"><label for="latitude">Latitude</label><input id="latitude" type="number" name="latitude" placeholder="Latitude" min="-90" max="90" step="any" required></div>
         <div class="field"><label for="longitude">Longitude</label><input id="longitude" type="number" name="longitude" placeholder="Longitude" min="-180" max="180" step="any" required></div>
+        <div class="field"><label for="altitude">Elevation (metres)</label><input id="altitude" type="number" name="altitude" value="0" step="any"><small>Optional horizon input</small></div>
         <button class="calculate" type="submit" disabled><span>Calculate charts</span><span aria-hidden="true">→</span></button>
       </form>
       <p class="form-warning"><strong>Before calculating:</strong> this beta produces astrology interpretations only. Never use its output as the sole basis for an important decision.</p>
@@ -75,6 +76,7 @@
     <div id="results" hidden>
       <aside class="result-warning"><strong>Experimental astrology output · not real-life advice</strong><span>Beta results may be incomplete or inaccurate. Verify birth data and use considerate personal judgment.</span></aside>
       <section class="result-header">
+        <button id="print-life-report" class="report-button" type="button">Print / save report PDF</button>
         <div><p class="eyebrow">Calculated chart</p><h2 id="result-title">Varga overview</h2><p id="result-meta"></p></div>
         <div class="lagna-orb"><span>Rāśi Lagna</span><strong id="rasi-lagna">—</strong></div>
       </section>
@@ -88,6 +90,14 @@
             <tbody id="degree-table-body"></tbody>
           </table>
         </div>
+      </section>
+
+      <section class="panchanga-card" aria-labelledby="panchanga-heading">
+        <div class="section-heading compact"><div><span class="step">03</span><h2 id="panchanga-heading">Panchanga &amp; nakshatras</h2></div><p>Local sunrise context and exact sidereal lunar mansion.</p></div>
+        <div id="panchanga-summary" class="panchanga-summary"></div>
+        <div id="special-lagna-summary" class="special-lagna-summary"></div>
+        <div class="degree-table-wrap"><table class="degree-table nakshatra-table"><thead><tr><th>Body</th><th>Nakshatra</th><th>Pada</th><th>Lord</th><th>Navamsa</th><th>Progress</th></tr></thead><tbody id="nakshatra-table-body"></tbody></table></div>
+        <p id="solar-limitations" class="limitations"></p>
       </section>
 
       <section class="charts-section">

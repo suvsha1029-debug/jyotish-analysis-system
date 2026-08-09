@@ -141,6 +141,7 @@ export function vimshottariTimeline(moonLongitude, birthDate, asOf = new Date())
   const fractionElapsed = ((moonLongitude % segment) + segment) % segment / segment;
   let mdStart = addYears(birthDate, -fractionElapsed * DASHA_YEARS[lord]);
   const periods = [];
+  const lifeEnd=addYears(birthDate,120);
   for (let cycle = 0; cycle < 18; cycle += 1) {
     const mdLord = DASHA_LORDS[(lordIndex + cycle) % 9];
     const mdEnd = addYears(mdStart, DASHA_YEARS[mdLord]);
@@ -149,13 +150,13 @@ export function vimshottariTimeline(moonLongitude, birthDate, asOf = new Date())
     for (let sub = 0; sub < 9; sub += 1) {
       const adLord = DASHA_LORDS[(mdSequenceIndex + sub) % 9];
       const adEnd = addYears(adStart, DASHA_YEARS[mdLord] * DASHA_YEARS[adLord] / 120);
-      if (adEnd >= birthDate && adStart <= addYears(asOf, 15)) {
+      if (adEnd >= birthDate && adStart <= lifeEnd) {
         periods.push({ mdLord, adLord, start: isoDay(adStart), end: isoDay(adEnd), current: asOf >= adStart && asOf < adEnd });
       }
       adStart = adEnd;
     }
     mdStart = mdEnd;
-    if (mdStart > addYears(asOf, 16)) break;
+    if (mdStart > lifeEnd) break;
   }
   return { nakshatraIndex, birthDashaLord: lord, periods };
 }
@@ -371,7 +372,10 @@ function buildOverallPromises(result, structural, domains) {
   const overall=counts.Good>=Math.ceil(rows.length/2)?"Good":counts.Low>=Math.ceil(rows.length/2)?"Low":"Moderate";
   return {
     overall,counts,rows,
-    specialPoints:Object.entries(structural.arudhas).filter(([key])=>["AL","A2","A4","A9","A10","A11","UL"].includes(key)).map(([key,value])=>({key,...value})),
+    specialPoints:[
+      ...Object.entries(structural.arudhas).filter(([key])=>["AL","A2","A4","A9","A10","A11","UL"].includes(key)).map(([key,value])=>({key,...value,type:"Arudha"})),
+      ...Object.entries(structural.specialLagnas||{}).map(([key,value])=>({key:key.replace(/([A-Z])/g," $1").replace(/^./,(c)=>c.toUpperCase()),house:null,...value,type:"Sunrise-derived"})),
+    ],
     nodes:structural.nodes,
     unavailable:structural.unavailable.filter((item)=>/Lagna/.test(item)),
     method:[

@@ -2,6 +2,7 @@ export const SIGNS = Object.freeze([
   "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
   "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
 ]);
+import { buildPanchanga } from "./panchanga-engine.js";
 
 export const VARGAS = Object.freeze({
   D1: "Rāśi",
@@ -210,12 +211,16 @@ export async function calculateChart(input, ephemeris) {
   const longitude = Number(input.longitude);
   validateCoordinates(latitude, longitude);
   const utcDate = parseBirthDateTime(input.date, input.time, input.utcOffset);
-  const astronomical = await ephemeris.calculate({ utcDate, latitude, longitude });
+  const localMidnightUtc = parseBirthDateTime(input.date, "00:00:00", input.utcOffset);
+  const astronomical = await ephemeris.calculate({ utcDate, latitude, longitude, localMidnightUtc, altitude:Number(input.altitude || 0) });
   const built = buildCharts(astronomical.positions);
+  const panchanga = buildPanchanga({ positions:built.positions, birthUtc:utcDate, localDate:input.date, solarEvents:astronomical.solarEvents });
   return {
     local: `${input.date}T${input.time}${input.utcOffset}`,
     utc: utcDate.toISOString(),
     jd: astronomical.jd,
+    location: { latitude, longitude, altitude:Number(input.altitude || 0) },
+    panchanga,
     ...built,
   };
 }

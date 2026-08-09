@@ -106,6 +106,37 @@ function renderPositions(positions) {
   });
 }
 
+const SIGN_NAMES=["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
+function longitudeLabel(value){
+  if(!Number.isFinite(value)) return "Unavailable";
+  const normalized=((value%360)+360)%360,sign=Math.floor(normalized/30),degree=normalized%30;
+  return `${degree.toFixed(2)}° ${SIGN_NAMES[sign]}`;
+}
+function localEventTime(iso,local){
+  if(!iso) return "Unavailable";
+  const match=/([+-])(\d{2}):(\d{2})$/.exec(local||"");
+  const minutes=match?(match[1]==="+"?1:-1)*(Number(match[2])*60+Number(match[3])):0;
+  const date=new Date(new Date(iso).getTime()+minutes*60000);
+  return `${date.toISOString().slice(0,10)} ${date.toISOString().slice(11,19)}`;
+}
+function renderPanchanga(result){
+  const p=result.panchanga;
+  if(!p) return;
+  const operative=p.solar?.operativeWindow;
+  const cards=[
+    ["Sunrise",localEventTime(operative?.sunrise?.utc,result.local),operative?.phase||"Local solar context"],
+    ["Sunset",localEventTime(operative?.sunset?.utc,result.local),"Calculated apparent horizon"],
+    ["Birth nakshatra",`${p.birthNakshatra.name} · Pada ${p.birthNakshatra.pada}`,`Lord ${p.birthNakshatra.lord}`],
+    ["Weekday / Hora",`${p.weekdayLord} · ${p.hora?.lord||"Unavailable"}`,p.hora?`${p.hora.phase} Hora ${p.hora.number}`:"Solar window unavailable"],
+    ["Birth-time check",result.birthTimeSensitivity?.level||"Not run",result.birthTimeSensitivity?`D1 ${result.birthTimeSensitivity.stability.D1?"stable":"changes"}; D60 ${result.birthTimeSensitivity.stability.D60?"stable":"changes"}`:"Perturbation service unavailable"],
+  ];
+  byId("panchanga-summary").innerHTML=cards.map(([label,value,note])=>`<article><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join("");
+  const lagnaLabels={bhavaLagna:"Bhava Lagna",horaLagna:"Hora Lagna",ghatiLagna:"Ghati Lagna"};
+  byId("special-lagna-summary").innerHTML=p.specialLagnas?`<div><span>Elapsed from operative sunrise</span><strong>${p.elapsedGhatis.toFixed(3)} ghatis</strong></div>${Object.entries(lagnaLabels).map(([key,label])=>`<article><span>${label}</span><strong>${longitudeLabel(p.specialLagnas[key])}</strong></article>`).join("")}`:`<p>Sunrise-derived special Lagnas are unavailable.</p>`;
+  byId("nakshatra-table-body").innerHTML=Object.entries(p.nakshatras).map(([body,n])=>`<tr><th>${body}</th><td>${n.name}</td><td>${n.pada}</td><td>${n.lord}</td><td>${n.navamsaSign}</td><td>${n.progressPercent.toFixed(2)}%</td></tr>`).join("");
+  byId("solar-limitations").textContent=p.limitations;
+}
+
 function renderChart(code) {
   selectedChartCode = code;
   const chart = currentResult.charts[code];
@@ -181,7 +212,7 @@ function renderOverallPromises() {
   document.querySelectorAll(".insight-tab").forEach((tab)=>tab.setAttribute("aria-selected",String(tab.dataset.insight===selectedInsight)));
   const report=currentPrediction.overallPromises;
   const rows=report.rows.map((row)=>`<details class="promise-domain" ${row.key==="overview"?"open":""}><summary><span><b>${row.label}</b><small>${row.varga} confirmation · ${row.arudhaKey} ${row.arudha?`in H${row.arudha.house} ${row.arudha.sign}`:"unavailable"}</small></span><em class="promise-level ${row.promise.toLowerCase()}">${row.promise}</em></summary><div class="promise-domain-body"><div class="promise-layers">${row.layers.map((layer)=>`<article><span>${layer.label}</span><b class="${layer.level.toLowerCase()}">${layer.level}</b><p>${layer.detail}</p></article>`).join("")}</div><div class="promise-evidence"><section><h4>Supporting structure</h4>${row.support.map((item)=>`<p><b>${item.title}</b>${item.detail}</p>`).join("")||"<p>No configured support item.</p>"}</section><section><h4>Contradictions / cautions</h4>${row.cautions.map((item)=>`<p><b>${item.title}</b>${item.detail}</p>`).join("")||"<p>No major configured contradiction.</p>"}</section></div>${row.nodes.length?`<div class="promise-node-note"><b>Rahu-Ketu involvement</b>${row.nodes.map((node)=>`${node.node} in H${node.house} ${node.sign}; sign controller ${node.signDispositor}, nakshatra controller ${node.nakshatraLord}${node.repeatedVargas.length?`; repeated in ${node.repeatedVargas.join(", ")}`:""}.`).join(" ")}</div>`:""}</div></details>`).join("");
-  const points=report.specialPoints.map((point)=>`<article><b>${point.key}</b><span>H${point.house} · ${point.sign}</span><small>From H${point.sourceHouse}, lord ${point.lord}</small></article>`).join("");
+  const points=report.specialPoints.map((point)=>point.type==="Sunrise-derived"?`<article><b>${point.key}</b><span>${point.degree.toFixed(2)}° · ${point.sign}</span><small>Verified local-sunrise calculation</small></article>`:`<article><b>${point.key}</b><span>H${point.house} · ${point.sign}</span><small>From H${point.sourceHouse}, lord ${point.lord}</small></article>`).join("");
   const nodes=report.nodes.map((node)=>`<article><span>${node.node} · ${node.axis}</span><h4>${node.sign} in H${node.house}</h4><p>Sign lord ${node.signDispositor}; nakshatra lord ${node.nakshatraLord}. ${node.repeatedVargas.length?`House repetition: ${node.repeatedVargas.join(", ")}.`:"No same-house repetition in the configured supporting Vargas."}</p><small>${node.source}</small></article>`).join("");
   byId("insight-content").innerHTML=`<div class="insight-head"><div><h3>Overall natal promises</h3><p>Stored potential before MD-AD, transit or date-based activation.</p></div><span class="varga-badge">Timing excluded</span></div><div class="promise-summary"><div><span>Overall structural picture</span><strong>${report.overall}</strong></div><p><b>${report.counts.Good}</b> good · <b>${report.counts.Moderate}</b> moderate · <b>${report.counts.Low}</b> low topic promises</p></div><div class="promise-method">${report.method.map((item,index)=>`<p><b>${index+1}</b>${item}</p>`).join("")}</div><h4 class="analysis-title">Verified special manifestation points</h4><div class="special-point-grid">${points}</div><p class="limitations">${report.unavailable.join("; ")}. These sunrise-dependent points are shown as unavailable rather than estimated. Arudha points above are calculated and used as manifestation references.</p><h4 class="analysis-title">Rahu-Ketu structural axis</h4><p class="node-interpretive-note">Some modern traditions give the nodes special prominence in Kali Yuga. This application labels that as an interpretive belief, not an empirical fact, and still judges each node through its controllers and repeated chart context.</p><div class="promise-node-grid">${nodes}</div><h4 class="analysis-title">Domain promises without timing</h4><div class="promise-domains">${rows}</div><div class="source-key"><strong>Method sources:</strong> ${report.sources.join(" · ")}. Classical and modern source rules are paraphrased; no timing component enters the promise rating.</div>`;
 }
@@ -264,12 +295,25 @@ function renderReadingGuide() {
   byId("insight-content").innerHTML = `<div class="insight-head"><div><h3>How to read the charts</h3><p>The rulebook's required evaluation order, kept separate from prediction claims.</p></div><span class="varga-badge">Reading guide</span></div><div class="reading-steps">${currentPrediction.readingOrder.map((step) => `<div class="reading-step">${step}</div>`).join("")}</div><div class="source-key"><strong>Output dimensions:</strong> Promise asks whether a result is structurally available. Strength asks whether relevant factors can deliver. Ease describes friction. Stability describes consolidation. Confidence reflects independent evidence, not certainty.</div>`;
 }
 
+function renderLifeReport(){
+  selectedInsight="life-report";
+  document.querySelectorAll(".insight-tab").forEach((tab)=>tab.setAttribute("aria-selected",String(tab.dataset.insight===selectedInsight)));
+  const promise=currentPrediction.overallPromises;
+  const domainRows=promise.rows.map((row)=>`<tr><th>${row.label}</th><td>${row.varga}</td><td><b class="promise-level ${row.promise.toLowerCase()}">${row.promise}</b></td><td>${row.layers.map((layer)=>`${layer.label}: ${layer.level}`).join(" · ")}</td></tr>`).join("");
+  const now=currentPrediction.currentPeriod;
+  const next=currentPrediction.timeline.periods.filter((period)=>period.theme.phase==="upcoming").slice(0,3);
+  const periods=[...(now?[now]:[]),...next].map((period,index)=>`<article><span>${index===0&&period.current?"CURRENT PERIOD":`NEXT WINDOW ${index+(now?0:1)}`}</span><h4>${period.mdLord}–${period.adLord} · ${period.theme.delivery}</h4><p>${period.start} → ${period.end} · ${period.geometry.relation}</p><small>${period.theme.summary}</small></article>`).join("");
+  const vargas=Object.entries(currentResult.charts).map(([code,chart])=>`<span><b>${code}</b>${chart.ascSign}</span>`).join("");
+  const birthNak=currentResult.panchanga?.birthNakshatra;
+  byId("insight-content").innerHTML=`<div class="life-report"><div class="insight-head"><div><h3>Integrated Life Report</h3><p>D1-led natal architecture, specialist Vargas, Ashtakavarga and MD–AD activation.</p></div><span class="varga-badge">Beta interpretive report</span></div><section class="report-cover"><span>STRUCTURAL OVERVIEW</span><h4>${promise.overall}</h4><p>${promise.counts.Good} good · ${promise.counts.Moderate} moderate · ${promise.counts.Low} low domain promises. This is an astrological evidence label, not a probability or a real-life guarantee.</p></section><div class="report-facts"><span><b>Birth record</b>${currentResult.local}</span><span><b>Rasi Lagna</b>${currentResult.charts.D1.ascSign}</span><span><b>Moon nakshatra</b>${birthNak?`${birthNak.name}, pada ${birthNak.pada}, lord ${birthNak.lord}`:"Unavailable"}</span><span><b>Birth-time sensitivity</b>${currentResult.birthTimeSensitivity?.level||"Not run"}</span><span><b>Evidence scope</b>D1 + relevant Varga + SAV/BAV + structure + MD–AD</span></div><h4 class="analysis-title">Overall promises before timing</h4><div class="analysis-scroll"><table class="analysis-table"><thead><tr><th>Domain</th><th>Specialist chart</th><th>Promise</th><th>Evidence layers</th></tr></thead><tbody>${domainRows}</tbody></table></div><h4 class="analysis-title">Divisional ascendants</h4><div class="report-vargas">${vargas}</div><h4 class="analysis-title">Current and next three MD–AD windows</h4><div class="report-periods">${periods||"<p>No displayed periods.</p>"}</div><p class="limitations">Method order: D1 promise first; functional lordship, dignity, dispositors, aspects and yoga context next; the topic-specific divisional chart and Ashtakavarga confirm; MD–AD times what is already promised. D60 is fine-grained and birth-time sensitive. Shadbala, Bhavabala, live transits and Pratyantardasha are not calculated in this version.</p><div class="report-disclaimer"><b>BETA HOBBY PROJECT — NOT REAL-LIFE ADVICE.</b> Interpretive astrology can be inaccurate. Do not use this report for medical, legal, financial, safety, relationship, career or other important decisions.</div></div>`;
+}
+
 function renderPredictionWorkspace(result) {
   currentPrediction = result.prediction;
   const tabs = byId("insight-tabs"); tabs.replaceChildren();
-  [...Object.entries(DOMAIN_SPECS).map(([key, spec]) => ({ key, label: spec.label })), {key:"promises",label:"Overall promises"},{key:"confirmation",label:"Confirmation"},{key:"ashtakavarga",label:"Ashtakavarga"},{key:"structure",label:"Lords & yogas"},{key:"nodes",label:"Rahu-Ketu"},{key:"best-periods",label:"Best Mahadashas"}, { key: "timeline", label: "Timeline" }, { key: "guide", label: "How to read" }].forEach(({ key, label }) => {
+  [...Object.entries(DOMAIN_SPECS).map(([key, spec]) => ({ key, label: spec.label })), {key:"promises",label:"Overall promises"},{key:"confirmation",label:"Confirmation"},{key:"ashtakavarga",label:"Ashtakavarga"},{key:"structure",label:"Lords & yogas"},{key:"nodes",label:"Rahu-Ketu"},{key:"best-periods",label:"Best Mahadashas"}, { key: "timeline", label: "Timeline" }, {key:"life-report",label:"Life report / PDF"}, { key: "guide", label: "How to read" }].forEach(({ key, label }) => {
     const tab = document.createElement("button"); tab.type = "button"; tab.role = "tab"; tab.className = "insight-tab"; tab.dataset.insight = key; tab.textContent = label; tab.setAttribute("aria-selected", String(key === selectedInsight));
-    tab.addEventListener("click", () => key === "timeline" ? renderTimelineThemes() : key === "best-periods" ? renderBestPeriods() : key === "guide" ? renderReadingGuide() : key === "promises" ? renderOverallPromises() : key === "confirmation" ? renderConfirmation() : key === "ashtakavarga" ? renderAshtakavarga() : key === "structure" ? renderStructure() : key === "nodes" ? renderNodes() : renderDomainInsight(key));
+    tab.addEventListener("click", () => key === "timeline" ? renderTimelineThemes() : key === "best-periods" ? renderBestPeriods() : key === "life-report" ? renderLifeReport() : key === "guide" ? renderReadingGuide() : key === "promises" ? renderOverallPromises() : key === "confirmation" ? renderConfirmation() : key === "ashtakavarga" ? renderAshtakavarga() : key === "structure" ? renderStructure() : key === "nodes" ? renderNodes() : renderDomainInsight(key));
     tabs.append(tab);
   });
   renderDomainInsight(DOMAIN_SPECS[selectedInsight] ? selectedInsight : "overview");
@@ -280,6 +324,12 @@ document.querySelectorAll("#style-tabs button").forEach((button) => button.addEv
   document.querySelectorAll("#style-tabs button").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
   if (currentResult) renderChart(selectedChartCode);
 }));
+byId("print-life-report").addEventListener("click",()=>{
+  if(!currentResult||!currentPrediction) return;
+  renderLifeReport();
+  byId("insights-heading").scrollIntoView({block:"start"});
+  setTimeout(()=>window.print(),80);
+});
 
 function renderResult(result) {
   currentResult = result;
@@ -288,6 +338,7 @@ function renderResult(result) {
   byId("result-meta").textContent = `${result.local}  ·  UTC ${result.utc.replace(".000Z", "Z")}  ·  JD ${result.jd.toFixed(6)}`;
   byId("rasi-lagna").textContent = result.charts.D1.ascSign;
   renderPositions(result.positions);
+  renderPanchanga(result);
   const tabs = byId("chart-tabs"); tabs.replaceChildren();
   Object.entries(result.charts).forEach(([code, chart], index) => {
     const tab = document.createElement("button");
