@@ -42,6 +42,7 @@ let selectedChartStyle = "north";
 let currentPrediction = null;
 let selectedInsight = "overview";
 let timelineView = "current";
+let lastCalculationInput = null;
 
 function showError(message) { errorBox.textContent = message; errorBox.hidden = false; }
 function clearError() { errorBox.hidden = true; errorBox.textContent = ""; }
@@ -311,9 +312,9 @@ function renderLifeReport(){
 function renderPredictionWorkspace(result) {
   currentPrediction = result.prediction;
   const tabs = byId("insight-tabs"); tabs.replaceChildren();
-  [...Object.entries(DOMAIN_SPECS).map(([key, spec]) => ({ key, label: spec.label })), {key:"promises",label:"Overall promises"},{key:"confirmation",label:"Confirmation"},{key:"ashtakavarga",label:"Ashtakavarga"},{key:"structure",label:"Lords & yogas"},{key:"nodes",label:"Rahu-Ketu"},{key:"best-periods",label:"Best Mahadashas"}, { key: "timeline", label: "Timeline" }, {key:"life-report",label:"Life report / PDF"}, { key: "guide", label: "How to read" }].forEach(({ key, label }) => {
+  [...Object.entries(DOMAIN_SPECS).map(([key, spec]) => ({ key, label: spec.label })), {key:"promises",label:"Overall promises"},{key:"confirmation",label:"Confirmation"},{key:"ashtakavarga",label:"Ashtakavarga"},{key:"structure",label:"Lords & yogas"},{key:"nodes",label:"Rahu-Ketu"},{key:"best-periods",label:"Best Mahadashas"}, { key: "timeline", label: "Timeline" }, { key: "guide", label: "How to read" }].forEach(({ key, label }) => {
     const tab = document.createElement("button"); tab.type = "button"; tab.role = "tab"; tab.className = "insight-tab"; tab.dataset.insight = key; tab.textContent = label; tab.setAttribute("aria-selected", String(key === selectedInsight));
-    tab.addEventListener("click", () => key === "timeline" ? renderTimelineThemes() : key === "best-periods" ? renderBestPeriods() : key === "life-report" ? renderLifeReport() : key === "guide" ? renderReadingGuide() : key === "promises" ? renderOverallPromises() : key === "confirmation" ? renderConfirmation() : key === "ashtakavarga" ? renderAshtakavarga() : key === "structure" ? renderStructure() : key === "nodes" ? renderNodes() : renderDomainInsight(key));
+    tab.addEventListener("click", () => key === "timeline" ? renderTimelineThemes() : key === "best-periods" ? renderBestPeriods() : key === "guide" ? renderReadingGuide() : key === "promises" ? renderOverallPromises() : key === "confirmation" ? renderConfirmation() : key === "ashtakavarga" ? renderAshtakavarga() : key === "structure" ? renderStructure() : key === "nodes" ? renderNodes() : renderDomainInsight(key));
     tabs.append(tab);
   });
   renderDomainInsight(DOMAIN_SPECS[selectedInsight] ? selectedInsight : "overview");
@@ -324,11 +325,18 @@ document.querySelectorAll("#style-tabs button").forEach((button) => button.addEv
   document.querySelectorAll("#style-tabs button").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
   if (currentResult) renderChart(selectedChartCode);
 }));
-byId("print-life-report").addEventListener("click",()=>{
-  if(!currentResult||!currentPrediction) return;
-  renderLifeReport();
-  byId("insights-heading").scrollIntoView({block:"start"});
-  setTimeout(()=>window.print(),80);
+byId("print-life-report").addEventListener("click",async()=>{
+  if(!lastCalculationInput) return showError("Calculate a chart before generating its PDF report.");
+  const button=byId("print-life-report"),original=button.textContent;
+  clearError();button.disabled=true;button.textContent="Building PDF...";
+  try{
+    const response=await fetch(`${import.meta.env.VITE_API_BASE_URL||""}/api/report`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...lastCalculationInput,locationName:selectedLocation})});
+    if(!response.ok){const problem=await response.json().catch(()=>({}));throw new Error(problem.error||"The report service could not generate this PDF.");}
+    const blob=await response.blob(),url=URL.createObjectURL(blob),anchor=document.createElement("a");
+    const disposition=response.headers.get("content-disposition")||"",match=/filename="?([^";]+)"?/i.exec(disposition);
+    anchor.href=url;anchor.download=match?.[1]||"jyotish-life-report.pdf";document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+  }catch(error){showError(error.message);}
+  finally{button.disabled=false;button.textContent=original;}
 });
 
 function renderResult(result) {
@@ -369,12 +377,13 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault(); clearError(); calculateButton.disabled = true;
   calculateButton.querySelector("span").textContent = "Calculating…";
   try {
+    const requestData=Object.fromEntries(new FormData(form));
     const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/api/chart`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(new FormData(form))),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestData),
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "Calculation failed.");
-    renderResult(payload);
+    lastCalculationInput=requestData;renderResult(payload);
   }
   catch (error) { showError(error.message); }
   finally { calculateButton.disabled = false; calculateButton.querySelector("span").textContent = "Calculate charts"; }
