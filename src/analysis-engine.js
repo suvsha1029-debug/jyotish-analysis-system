@@ -7,6 +7,15 @@ const NAKSHATRA_LORDS = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupite
 const OWN_SIGNS = { Sun:[4], Moon:[3], Mars:[0,7], Mercury:[2,5], Jupiter:[8,11], Venus:[1,6], Saturn:[9,10] };
 const EXALTATION = { Sun:0, Moon:1, Mars:9, Mercury:5, Jupiter:3, Venus:11, Saturn:6 };
 const DEBILITATION = { Sun:6, Moon:7, Mars:3, Mercury:11, Jupiter:9, Venus:5, Saturn:0 };
+const MOOLATRIKONA = Object.freeze({
+  Sun:{sign:4,start:0,end:20},
+  Moon:{sign:1,start:3,end:30},
+  Mars:{sign:0,start:0,end:12},
+  Mercury:{sign:5,start:15,end:20},
+  Jupiter:{sign:8,start:0,end:10},
+  Venus:{sign:6,start:0,end:15},
+  Saturn:{sign:10,start:0,end:20},
+});
 const SPECIAL_ASPECTS = { Mars:[4,7,8], Jupiter:[5,7,9], Saturn:[3,7,10], Rahu:[5,7,9], Ketu:[5,7,9] };
 
 // Target BAV -> contributions counted from Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn and Ascendant.
@@ -33,16 +42,20 @@ export function functionalNature(result,body) {
   if(!CLASSICAL.includes(body)) return {label:"Node / controller-dependent",code:"Node",reasons:["Judge through sign lord, nakshatra lord, associations and dasha context."]};
   const owned=lordHouses(result,body), benefic=owned.filter((house)=>[1,5,9].includes(house)), difficult=owned.filter((house)=>[3,6,8,11].includes(house));
   const kendra=owned.filter((house)=>[1,4,7,10].includes(house)), trine=owned.filter((house)=>[1,5,9].includes(house));
+  // H1 is both a kendra and a trikona, but ownership of H1 alone does not
+  // make its lord a technical kendra-trikona yogakaraka. That title requires
+  // ownership of distinct angular and trinal houses (for example H4 + H9).
+  const yogakaraka=kendra.some((house)=>[4,7,10].includes(house))&&trine.some((house)=>[5,9].includes(house));
   const reasons=[];
   if(trine.length) reasons.push(`Trinal ownership: ${trine.map((h)=>`H${h}`).join(", ")}`);
   if(kendra.length) reasons.push(`Angular ownership: ${kendra.map((h)=>`H${h}`).join(", ")}`);
   if(difficult.length) reasons.push(`Difficult-house ownership: ${difficult.map((h)=>`H${h}`).join(", ")}`);
   if(owned.some((house)=>[2,7].includes(house))) reasons.push("Maraka-house ownership modifies delivery; it is not automatic harm.");
-  if(kendra.length&&trine.length) return {label:"Functional benefic / yogakaraka",code:"FB",reasons};
+  if(yogakaraka) return {label:"Functional benefic / yogakaraka",code:"FB",yogakaraka:true,reasons};
   const score=benefic.length*2-difficult.length*1.5;
-  if(score>0) return {label:"Functional benefic",code:"FB",reasons};
-  if(score<0) return {label:"Functional malefic",code:"FM",reasons};
-  return {label:"Functionally mixed",code:"Mixed",reasons};
+  if(score>0) return {label:"Functional benefic",code:"FB",yogakaraka:false,reasons};
+  if(score<0) return {label:"Functional malefic",code:"FM",yogakaraka:false,reasons};
+  return {label:"Functionally mixed",code:"Mixed",yogakaraka:false,reasons};
 }
 
 export function debilitationCancellation(result,body) {
@@ -62,9 +75,24 @@ export function debilitationCancellation(result,body) {
 
 export function dignityFor(body, longitude) {
   const sign = signIndex(longitude);
+  const degree = (((longitude % 30) + 30) % 30);
   if (!CLASSICAL.includes(body)) return "Node / point";
+  // BPHS divides Virgo more precisely for Mercury: 0-15 exaltation,
+  // 15-20 moolatrikona and 20-30 own sign. The Moon is treated similarly
+  // after its 3-degree exaltation portion in Taurus.
+  if (body === "Mercury" && sign === EXALTATION.Mercury) {
+    if (degree < 15) return "Exalted";
+    if (degree < 20) return "Moolatrikona";
+    return "Own sign";
+  }
+  if (body === "Moon" && sign === EXALTATION.Moon) {
+    if (degree <= 3) return "Exalted";
+    return "Moolatrikona";
+  }
   if (EXALTATION[body] === sign) return "Exalted";
   if (DEBILITATION[body] === sign) return "Debilitated";
+  const moolatrikona=MOOLATRIKONA[body];
+  if(moolatrikona&&sign===moolatrikona.sign&&degree>=moolatrikona.start&&degree<moolatrikona.end) return "Moolatrikona";
   if (OWN_SIGNS[body].includes(sign)) return "Own sign";
   return "Other sign";
 }

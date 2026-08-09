@@ -45,6 +45,21 @@ function confirmationLabel(score) {
   return "Low";
 }
 
+const STRONG_DIGNITIES=new Set(["Exalted","Moolatrikona","Own sign"]);
+function d60Reliability(result){
+  const sensitivity=result.birthTimeSensitivity;
+  const reliable=Boolean(sensitivity?.stability?.D60&&sensitivity?.d60AmshaStable);
+  return {
+    reliable,
+    label:reliable?"Included as fine confirmation":"Excluded from scoring",
+    reason:reliable
+      ? `D60 ascendant and amsha remained stable across the configured +/-${sensitivity.rangeMinutes||10}-minute audit.`
+      : sensitivity
+        ? `${sensitivity.level}: D60 did not remain stable enough to affect a conclusion.`
+        : "No birth-time perturbation audit is attached; D60 is displayed only and cannot affect a conclusion.",
+  };
+}
+
 const MOVABLE=new Set(["Aries","Cancer","Libra","Capricorn"]), FIXED=new Set(["Taurus","Leo","Scorpio","Aquarius"]);
 function badhakaHouse(ascSign){ return MOVABLE.has(ascSign)?11:FIXED.has(ascSign)?9:7; }
 function vargaDomainAnalysis(result,domain){
@@ -111,7 +126,7 @@ function buildConfirmation(result, domain, structural, current, savAverage) {
   const relevantYogaTypes = ["money", "gains"].includes(domain.key) ? ["wealth"] : ["career", "fame", "overview"].includes(domain.key) ? ["status", "wealth"] : [];
   const yogaCount = structural.yogas.filter((yoga) => relevantYogaTypes.includes(yoga.type)).length;
   const dignifiedLords = new Set(domain.houses.map((house) => houseLord(d1, house))).size;
-  const conditionedLords = [...new Set(domain.houses.map((house) => houseLord(d1, house)))].filter((lord) => ["Own sign", "Exalted", "Moolatrikona", "Friendly sign"].includes(structural.planets[lord]?.dignity)).length;
+  const conditionedLords = [...new Set(domain.houses.map((house) => houseLord(d1, house)))].filter((lord) => STRONG_DIGNITIES.has(structural.planets[lord]?.dignity)||structural.planets[lord]?.dignity==="Friendly sign").length;
   const structureScore = Math.round(clamp(35 + yogaCount * 15 + (conditionedLords / Math.max(1, dignifiedLords)) * 35, 20, 95));
   const periodLords = current ? [current.mdLord, current.adLord] : [];
   const activationCount = periodLords.reduce((count, lord) => {
@@ -188,19 +203,31 @@ function periodTheme(result, structural, period, asOf) {
     return {key,label:spec.label,varga:spec.varga,method:spec.method,activations,savAverage:Number(savAverage.toFixed(1)),support:savAverage>=structural.ashtakavarga.average,rank:activations*2+(savAverage>=structural.ashtakavarga.average?1:0)};
   }).sort((a,b)=>b.rank-a.rank||b.activations-a.activations);
   const leaders=ranked.slice(0,3);
-  const d60=lords.map((lord)=>({lord,...shashtiamsaAmsha(result.positions[lord].longitude)}));
+  const d60Status=d60Reliability(result);
+  const d60=lords.map((lord)=>{const amsha=shashtiamsaAmsha(result.positions[lord].longitude);return {lord,...amsha,rawNature:amsha.nature,nature:d60Status.reliable?amsha.nature:"Display only - not scored",included:d60Status.reliable};});
   const activationTotal=leaders[0].activations+leaders[1].activations;
   const supportCount=leaders.slice(0,2).filter((item)=>item.support).length;
-  const beneficAmshas=d60.filter((item)=>item.nature==="Benefic").length;
+  const beneficAmshas=d60.filter((item)=>item.rawNature==="Benefic").length;
   const delivery=activationTotal>=7&&supportCount>=1?"Good":activationTotal>=3?"Moderate":"Low";
+  const directD1Load=lords.map((lord)=>{
+    const planet=structural.planets[lord];
+    return {lord,house:planet?.house,housesOwned:planet?.housesOwned||[],aspectedHouses:structural.aspects.filter((aspect)=>aspect.body===lord).map((aspect)=>aspect.toHouse)};
+  });
+  const activatedHouses=[...new Set(directD1Load.flatMap((item)=>[item.house,...item.housesOwned,...item.aspectedHouses]).filter(Boolean))].sort((a,b)=>a-b);
+  const nodeControllers=lords.filter((lord)=>["Rahu","Ketu"].includes(lord)).map((lord)=>{
+    const node=structural.nodes.find((item)=>item.node===lord);
+    return {node:lord,signDispositor:node?.signDispositor,nakshatraLord:node?.nakshatraLord};
+  });
+  const d1LoadText=directD1Load.map((item)=>`${item.lord} occupies H${item.house}${item.housesOwned.length?` and owns ${item.housesOwned.map((house)=>`H${house}`).join("/")}`:""}`).join("; ");
+  const controllerText=nodeControllers.length?` Node delivery is routed through ${nodeControllers.map((item)=>`${item.node}: ${item.signDispositor} (sign) and ${item.nakshatraLord} (nakshatra)`).join("; ")}.`:"";
   const start=new Date(`${period.start}T00:00:00Z`),end=new Date(`${period.end}T00:00:00Z`);
   const phase=period.current?"current":end<asOf?"past":"upcoming";
   return {
     phase,delivery,
     headline:`${leaders[0].label} and ${leaders[1].label}`,
     domains:leaders,
-    d60,
-    summary:`${period.mdLord} sets the period environment and ${period.adLord} executes it. ${leaders[0].label} leads through ${leaders[0].activations} D1/${leaders[0].varga} activations; its house SAV is ${leaders[0].support?"supportive":"below the chart average"}. ${beneficAmshas} of the 2 period lords occupy benefic D60 amshas.`,
+    d60,d60Reliability:d60Status,directD1Load,activatedHouses,nodeControllers,
+    summary:`${period.mdLord} sets the period environment and ${period.adLord} executes it. Direct D1 load: ${d1LoadText}.${controllerText} ${leaders[0].label} is the strongest specialist-chart activation (${leaders[0].varga}); its house SAV is ${leaders[0].support?"supportive":"below the chart average"}. ${d60Status.reliable?`${beneficAmshas} of the 2 period lords occupy benefic D60 amshas.`:`D60 is excluded from this judgment: ${d60Status.reason}`}`,
   };
 }
 
@@ -209,6 +236,7 @@ const NATURAL_NATURE=Object.freeze({Sun:"Natural malefic / authority karaka",Moo
 function angleDistance(a,b){const d=Math.abs(a-b)%360;return Math.min(d,360-d);}
 function buildMahadashaRankings(result,structural,timeline){
   const d1=result.charts.D1,d9=result.charts.D9,d10=result.charts.D10;
+  const d60Status=d60Reliability(result);
   const windows=Object.fromEntries(DASHA_LORDS.map((lord)=>{
     const rows=timeline.periods.filter((item)=>item.mdLord===lord);
     return [lord,rows.length?{start:rows[0].start,end:rows.at(-1).end,current:rows.some((item)=>item.current)}:null];
@@ -218,16 +246,16 @@ function buildMahadashaRankings(result,structural,timeline){
     const received=structural.aspects.filter((a)=>a.toHouse===house&&a.body!==lord).map((a)=>a.body);
     const conjunctions=rowByHouse(d1,house).bodies.filter((body)=>body!==lord&&body!=="Asc");
     const orb=COMBUSTION_ORBS[lord],solarDistance=orb?angleDistance(result.positions[lord].longitude,result.positions.Sun.longitude):null;
-    const combust=Boolean(orb&&solarDistance<=orb),sunStrong=["Own sign","Exalted"].includes(structural.planets.Sun.dignity)||[1,5,9,10,11].includes(structural.planets.Sun.house);
-    const dispositor=p.dispositor.controller,dispositorStrong=structural.planets[dispositor]&&(["Own sign","Exalted"].includes(structural.planets[dispositor].dignity)||[1,4,5,7,9,10,11].includes(structural.planets[dispositor].house));
+    const combust=Boolean(orb&&solarDistance<=orb),sunStrong=STRONG_DIGNITIES.has(structural.planets.Sun.dignity)||[1,5,9,10,11].includes(structural.planets.Sun.house);
+    const dispositor=p.dispositor.controller,dispositorStrong=structural.planets[dispositor]&&(STRONG_DIGNITIES.has(structural.planets[dispositor].dignity)||[1,4,5,7,9,10,11].includes(structural.planets[dispositor].house));
     const saturnSupport=combust&&received.includes("Saturn")&&(["FB","Mixed"].includes(structural.planets.Saturn.functional.code)||[3,6,10,11].includes(structural.planets.Saturn.house));
     const mitigations=[kendra||trikona?"angular/trinal placement":null,sunStrong?"supportive Sun condition":null,dispositorStrong?"supportive dispositor":null,saturnSupport?"constructive Saturn aspect":null].filter(Boolean);
     const d9House=bodyHouse(d9,lord),d10House=bodyHouse(d10,lord),d60=shashtiamsaAmsha(result.positions[lord].longitude);
-    let score=45+(p.functional.code==="FB"?15:p.functional.code==="FM"?-10:0)+(["Own sign","Exalted"].includes(p.dignity)?12:p.dignity==="Debilitated"?-12:0)+(kendra?7:0)+(trikona?8:0)+(upachaya?5:0)+(received.includes("Jupiter")?5:0)+(p.debilitation.cancelled?7:0)+([1,4,5,7,9,10,11].includes(d9House)?4:0)+([1,6,9,10,11].includes(d10House)?5:0)+(d60.nature==="Benefic"?5:d60.nature==="Malefic"?-5:0)+(result.positions[lord].retrograde?0:0);
+    let score=45+(p.functional.code==="FB"?15:p.functional.code==="FM"?-10:0)+(STRONG_DIGNITIES.has(p.dignity)?12:p.dignity==="Debilitated"?-12:0)+(kendra?7:0)+(trikona?8:0)+(upachaya?5:0)+(received.includes("Jupiter")?5:0)+(p.debilitation.cancelled?7:0)+([1,4,5,7,9,10,11].includes(d9House)?4:0)+([1,6,9,10,11].includes(d10House)?5:0)+(d60Status.reliable?(d60.nature==="Benefic"?5:d60.nature==="Malefic"?-5:0):0)+(result.positions[lord].retrograde?0:0);
     if(combust) score-=Math.max(2,10-mitigations.length*2);
     score=Math.round(clamp(score,15,95));
     const themes=Object.values(DOMAIN_SPECS).map((spec)=>({label:spec.label,varga:spec.varga,points:(spec.houses.includes(house)?2:0)+p.housesOwned.filter((h)=>spec.houses.includes(h)).length+((spec.vargaHouses||spec.houses).includes(bodyHouse(result.charts[spec.varga]||d1,lord))?1:0)+(spec.karakas?.includes(lord)?1:0)})).sort((a,b)=>b.points-a.points).slice(0,3);
-    return {lord,score,level:score>=68?"Good":score>=45?"Moderate":"Low",window:windows[lord],house,sign:p.sign,housesOwned:p.housesOwned,functional:p.functional,dignity:p.dignity,debilitation:p.debilitation,retrograde:Boolean(result.positions[lord].retrograde),upachaya,kendra,trikona,received,conjunctions,dispositor,dispositorStrong,combustion:{applicable:Boolean(orb),combust,distance:solarDistance===null?null:Number(solarDistance.toFixed(2)),orb,mitigations,statement:!orb?"Combustion is not applied to this body.":!combust?`Outside the configured ${orb}° combustion orb.`:`Combustion is a delivery modifier with ${mitigations.length} mitigating context(s); it is not treated as destruction.`},d9House,d10House,d60,themes,naturalNature:NATURAL_NATURE[lord]};
+    return {lord,score,level:score>=68?"Good":score>=45?"Moderate":"Low",window:windows[lord],house,sign:p.sign,housesOwned:p.housesOwned,functional:p.functional,dignity:p.dignity,debilitation:p.debilitation,retrograde:Boolean(result.positions[lord].retrograde),upachaya,kendra,trikona,received,conjunctions,dispositor,dispositorStrong,combustion:{applicable:Boolean(orb),combust,distance:solarDistance===null?null:Number(solarDistance.toFixed(2)),orb,mitigations,statement:!orb?"Combustion is not applied to this body.":!combust?`Outside the configured ${orb}° combustion orb.`:`Combustion is a delivery modifier with ${mitigations.length} mitigating context(s); it is not treated as destruction.`},d9House,d10House,d60:{...d60,rawNature:d60.nature,nature:d60Status.reliable?d60.nature:"Display only - not scored",included:d60Status.reliable},d60Reliability:d60Status,themes,naturalNature:NATURAL_NATURE[lord]};
   }).sort((a,b)=>b.score-a.score);
 }
 
@@ -334,7 +362,73 @@ function buildForeignAnalysis(result,structural,current) {
     axis:axis?{pair:axis.pair||"Controller route",relation:axis.relation,result:axisResult,mdLord:current.mdLord,adLord:current.adLord}:null,
     mainTheme:current?.theme?.domains?.[0]||null,
     otherThemes:current?.theme?.domains?.slice(1)||[],
-    d60:[...new Set([...Object.values(lords),...(current?[current.mdLord,current.adLord]:[])])].map((lord)=>({lord,...shashtiamsaAmsha(result.positions[lord].longitude)})),
+    d60Reliability:d60Reliability(result),
+    d60:[...new Set([...Object.values(lords),...(current?[current.mdLord,current.adLord]:[])])].map((lord)=>{const amsha=shashtiamsaAmsha(result.positions[lord].longitude),status=d60Reliability(result);return {lord,...amsha,rawNature:amsha.nature,nature:status.reliable?amsha.nature:"Display only - not scored",included:status.reliable};}),
+  };
+}
+
+function buildForeignPropertyAnalysis(result,structural,current){
+  const d1=result.charts.D1,d4=result.charts.D4;
+  const h4Lord=houseLord(d1,4),h9Lord=houseLord(d1,9),h12Lord=houseLord(d1,12);
+  const d4LagnaLord=houseLord(d4,1),d4FourthLord=houseLord(d4,4),d4NinthLord=houseLord(d4,9);
+  const connected=(first,second)=>{
+    if(first===second) return true;
+    const firstHouse=bodyHouse(d1,first),secondHouse=bodyHouse(d1,second);
+    return firstHouse===secondHouse||structural.aspects.some((aspect)=>(aspect.body===first&&aspect.toHouse===secondHouse)||(aspect.body===second&&aspect.toHouse===firstHouse));
+  };
+  const nodeAxis=bodyHouse(d1,"Ketu")===4&&bodyHouse(d1,"Rahu")===10;
+  const d4NodeAxis=bodyHouse(d4,"Ketu")===4&&bodyHouse(d4,"Rahu")===10;
+  const moonForeignStrength=bodyHouse(d1,h12Lord)===12&&STRONG_DIGNITIES.has(structural.planets[h12Lord]?.dignity);
+  const fourthNinthLink=connected(h4Lord,h9Lord);
+  const fourthTwelfthLink=connected(h4Lord,h12Lord);
+  const d4FourthLordHouse=bodyHouse(d4,d4FourthLord),d4NinthLordHouse=bodyHouse(d4,d4NinthLord);
+  const d4LagnaLordHouse=bodyHouse(d4,d4LagnaLord);
+  const wealthControllers=[...new Set([houseLord(d1,2),houseLord(d1,11)])];
+  const strongWealthControllers=wealthControllers.filter((lord)=>STRONG_DIGNITIES.has(structural.planets[lord]?.dignity)).length;
+
+  let foreignPoints=0;
+  if(moonForeignStrength) foreignPoints+=2;
+  if(nodeAxis) foreignPoints+=2;
+  if(fourthNinthLink) foreignPoints+=2;
+  if(fourthTwelfthLink) foreignPoints+=1;
+  if([9,10,11,12].includes(d4FourthLordHouse)) foreignPoints+=2;
+  if([9,10,12].includes(bodyHouse(d4,"Rahu"))) foreignPoints+=1;
+  if([1,4,5,7,9,10,11].includes(bodyHouse(d4,"Jupiter"))) foreignPoints+=1;
+
+  let acquisitionPoints=0;
+  if(structural.planets[h4Lord]?.functional?.code==="FB") acquisitionPoints+=2;
+  if([1,4,5,7,9,10,11].includes(bodyHouse(d1,h4Lord))) acquisitionPoints+=1;
+  if([1,4,5,7,9,10,11].includes(d4LagnaLordHouse)) acquisitionPoints+=1;
+  if([1,4,5,7,9,10,11].includes(d4FourthLordHouse)) acquisitionPoints+=2;
+  acquisitionPoints+=strongWealthControllers*2;
+
+  let fortunePoints=0;
+  if(structural.planets[h9Lord]?.functional?.code==="FB") fortunePoints+=2;
+  if(structural.planets[h9Lord]?.functional?.yogakaraka) fortunePoints+=1;
+  if(structural.aspects.some((aspect)=>aspect.body===h9Lord&&aspect.toHouse===1)) fortunePoints+=2;
+  if([1,5,9].includes(bodyHouse(d1,"Jupiter"))) fortunePoints+=1;
+  if([1,4,5,7,9,10,11].includes(d4NinthLordHouse)) fortunePoints+=1;
+  if([1,4,5,7,9,10,11].includes(bodyHouse(d4,"Jupiter"))) fortunePoints+=1;
+
+  const stabilityModifiers=[bodyHouse(d1,"Ketu")===4,bodyHouse(d4,"Ketu")===4,[6,8,12].includes(d4FourthLordHouse)].filter(Boolean).length;
+  const level=(points,good,moderate)=>points>=good?"Good":points>=moderate?"Moderate":"Low";
+  const activationLords=current?[current.mdLord,current.adLord]:[];
+  const activeControllers=activationLords.filter((lord)=>[h4Lord,h9Lord,h12Lord,d4FourthLord,d4NinthLord,...wealthControllers].includes(lord));
+  return {
+    foreignProperty:{level:level(foreignPoints,7,3),points:foreignPoints,detail:"Combines the D1 home/fortune/foreign structure with D4 property and residence controllers. It indicates potential, not a guaranteed country or purchase."},
+    acquisition:{level:level(acquisitionPoints,6,3),points:acquisitionPoints,detail:"Separates the ability to acquire property from whether the native remains satisfied living in it."},
+    fortune:{level:level(fortunePoints,6,3),points:fortunePoints,detail:"Bhagya is judged from H9/H9 lord, its Lagna contact, Jupiter and D4 repetition."},
+    residentialStability:{level:stabilityModifiers>=2?"Moderate":stabilityModifiers===1?"Moderate":"Good",modifiers:stabilityModifiers,detail:stabilityModifiers?"Ketu/property-axis repetition favours changes, multiple bases or detachment from one permanent home; it does not deny ownership.":"No major configured residence-instability modifier repeats."},
+    controllers:{h4Lord,h9Lord,h12Lord,d4LagnaLord,d4FourthLord,d4NinthLord,wealthControllers},
+    links:{fourthNinthLink,fourthTwelfthLink,nodeAxis,d4NodeAxis,moonForeignStrength},
+    timing:{activeControllers,detail:activeControllers.length?`${activeControllers.join(" and ")} ${activeControllers.length===1?"currently activates":"currently activate"} property/fortune/foreign controllers; timing still requires PD and transit narrowing.`:"The current MD-AD does not directly control the configured property/fortune/foreign lords."},
+    evidence:[
+      {label:"D1 property-fortune link",value:fourthNinthLink?`${h4Lord} controls or connects H4 and H9`:"No direct configured H4L-H9L link"},
+      {label:"D1 foreign base",value:moonForeignStrength?`${h12Lord} is strong in H12`:"H12 controller needs additional support"},
+      {label:"D1 home-career axis",value:nodeAxis?"Ketu H4 / Rahu H10 repeats relocation pressure":"No exact H4/H10 node axis"},
+      {label:"D4 delivery",value:`H4 lord ${d4FourthLord} in H${d4FourthLordHouse}; H9 lord ${d4NinthLord} in H${d4NinthLordHouse}`},
+      {label:"D4 home-career repetition",value:d4NodeAxis?"Ketu H4 / Rahu H10 repeats in D4":"No exact D4 H4/H10 node repetition"},
+    ],
   };
 }
 
@@ -417,6 +511,7 @@ export function buildPredictionReport(result, asOf = new Date()) {
     return [key,domain];
   }));
   const foreignAnalysis=buildForeignAnalysis(result,structural,current);
+  const foreignPropertyAnalysis=buildForeignPropertyAnalysis(result,structural,current);
   const foreignSpouseAnalysis=buildForeignSpouseAnalysis(result,structural,current);
   const overallPromises=buildOverallPromises(result,structural,domains);
   const mahadashaRankings=buildMahadashaRankings(result,structural,timeline);
@@ -427,6 +522,7 @@ export function buildPredictionReport(result, asOf = new Date()) {
     timeline,
     currentPeriod: current || null,
     foreignAnalysis,
+    foreignPropertyAnalysis,
     foreignSpouseAnalysis,
     overallPromises,
     mahadashaRankings,
