@@ -129,6 +129,20 @@ describe("Vimshottari timeline", () => {
     expect(inheritance.methodNote).toContain("D12 is used only for the native's parents");
     expect(report.domains.inheritance.dimensions.promise).toBe(inheritance.promise.level);
     expect(report.domains.inheritance.dimensions.stability).toBe(inheritance.retention.level);
+    expect(inheritance.promise.level).toBe("Moderate");
+    expect(inheritance.wealthInheritanceLinks.count).toBeGreaterThan(0);
+    expect(inheritance.wealthInheritanceLinks.secondToEighth).toBe(true);
+  });
+  it("adds honest plain-language synthesis to every horoscope domain",()=>{
+    const report=buildPredictionReport(result,new Date("2026-08-08T00:00:00Z"));
+    for(const domain of Object.values(report.domains)){
+      expect(domain.layman.headline).toBeTruthy();
+      expect(domain.layman.summary).toContain("not certainty");
+      expect(domain.layman.strongestPoint).toBeTruthy();
+      expect(domain.layman.howItMayShow).toBeTruthy();
+      expect(domain.layman.watchFor).toBeTruthy();
+    }
+    expect(report.lifeNarrative.summary).toContain("capacities rather than guaranteed events");
   });
   it("keeps spouse personal inheritance distinct from benefit reaching the native",()=>{
     const report=buildPredictionReport(result,new Date("2026-08-08T00:00:00Z"));
@@ -152,6 +166,13 @@ describe("Vimshottari timeline", () => {
     expect(venus.combustion.statement).toContain(venus.combustion.combust?"modifier":"Outside");
     expect(report.mahadashaRankings.every((item)=>item.d60?.name&&item.themes.length===3)).toBe(true);
     expect(report.mahadashaRankings.every((item)=>item.d60.included===false&&item.d60.nature.includes("not scored"))).toBe(true);
+    const profile=report.mahadashaProfiles.Venus;
+    expect(profile.vargas.map((item)=>item.code)).toEqual(["D2","D4","D9","D10","D11","D16","D24","D60"]);
+    expect(profile.ashtakavarga).toHaveProperty("placementSav");
+    expect(profile.plainSummary).toContain("not a promise");
+    expect(profile.subperiods.every((period)=>period.axis&&period.delivery)).toBe(true);
+    expect(report.mahadashaTransition).toMatchObject({from:"Ketu",to:"Venus",continuity:true});
+    expect(report.mahadashaTransition.plainSummary).toContain("clearing followed by construction");
   });
   it("allows D60 to affect ranking only after a stable perturbation audit",()=>{
     const unverified=buildPredictionReport(result,new Date("2026-08-08T00:00:00Z"));
@@ -160,5 +181,12 @@ describe("Vimshottari timeline", () => {
     expect(stable.mahadashaRankings.every((item)=>item.d60.included)).toBe(true);
     expect(stable.currentPeriod.theme.d60Reliability.reliable).toBe(true);
     expect(stable.mahadashaRankings.some((item)=>item.score!==unverified.mahadashaRankings.find((base)=>base.lord===item.lord).score)).toBe(true);
+  });
+  it("allows an explicitly verified exact birth time to include D60 only as fine confirmation",()=>{
+    const verified={...result,birthTimeSensitivity:{level:"Fine-chart sensitivity",stability:{D60:false},d60AmshaStable:false,verifiedByUser:true}};
+    const report=buildPredictionReport(verified,new Date("2026-08-08T00:00:00Z"));
+    expect(report.currentPeriod.theme.d60Reliability).toMatchObject({reliable:true,userVerified:true,auditStable:false});
+    expect(report.mahadashaProfiles.Venus.d60.included).toBe(true);
+    expect(report.mahadashaProfiles.Venus.d60Reliability.reason).toContain("cannot override D1");
   });
 });

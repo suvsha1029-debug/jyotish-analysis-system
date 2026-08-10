@@ -36,6 +36,19 @@ function rowByHouse(chart, house) { return chart.rows.find((row) => row.house ==
 function bodyHouse(chart, bodyName) { return chart.rows.find((row) => row.bodyDetails.some((body) => body.name === bodyName))?.house; }
 function bodySign(chart, bodyName) { return chart.rows.find((row) => row.bodyDetails.some((body) => body.name === bodyName))?.sign; }
 function houseLord(chart, house) { return PLANET_RULERS[rowByHouse(chart, house).sign]; }
+function planetsExchange(chart, first, second) {
+  if (!first || !second || first === second) return false;
+  return PLANET_RULERS[bodySign(chart, first)] === second && PLANET_RULERS[bodySign(chart, second)] === first;
+}
+function planetLinksHouse(chart, structural, planet, house) {
+  return bodyHouse(chart, planet) === house || houseLord(chart, house) === planet || structural.aspects.some((aspect) => aspect.body === planet && aspect.toHouse === house);
+}
+function planetsConnected(chart, structural, first, second) {
+  if (!first || !second) return false;
+  if (first === second || planetsExchange(chart, first, second)) return true;
+  const firstHouse = bodyHouse(chart, first), secondHouse = bodyHouse(chart, second);
+  return firstHouse === secondHouse || structural.aspects.some((aspect) => (aspect.body === first && aspect.toHouse === secondHouse) || (aspect.body === second && aspect.toHouse === firstHouse));
+}
 function qualitative(value) { return value >= 4 ? "High" : value >= 2 ? "Moderate" : value >= 1 ? "Mixed" : "Low"; }
 function addYears(date, years) { return new Date(date.getTime() + years * YEAR_MS); }
 function isoDay(date) { return date.toISOString().slice(0, 10); }
@@ -49,12 +62,16 @@ function confirmationLabel(score) {
 const STRONG_DIGNITIES=new Set(["Exalted","Moolatrikona","Own sign"]);
 function d60Reliability(result){
   const sensitivity=result.birthTimeSensitivity;
-  const reliable=Boolean(sensitivity?.stability?.D60&&sensitivity?.d60AmshaStable);
+  const userVerified=Boolean(sensitivity?.verifiedByUser);
+  const auditStable=Boolean(sensitivity?.stability?.D60&&sensitivity?.d60AmshaStable);
+  const reliable=userVerified||auditStable;
   return {
-    reliable,
+    reliable,userVerified,auditStable,
     label:reliable?"Included as fine confirmation":"Excluded from scoring",
-    reason:reliable
-      ? `D60 ascendant and amsha remained stable across the configured +/-${sensitivity.rangeMinutes||10}-minute audit.`
+    reason:userVerified
+      ? "The user marked the recorded birth time as verified to the second; D60 is included only as a fine confirmation and cannot override D1."
+      : auditStable
+        ? `D60 ascendant and amsha remained stable across the configured +/-${sensitivity.rangeMinutes||10}-minute audit.`
       : sensitivity
         ? `${sensitivity.level}: D60 did not remain stable enough to affect a conclusion.`
         : "No birth-time perturbation audit is attached; D60 is displayed only and cannot affect a conclusion.",
@@ -481,11 +498,7 @@ function buildForeignSpouseAnalysis(result,structural,current){
 function buildInheritanceAnalysis(result,structural,current){
   const d1=result.charts.D1,d2=result.charts.D2,d4=result.charts.D4,d10=result.charts.D10,d12=result.charts.D12;
   const lords=Object.fromEntries([2,4,6,7,8,9,10,11,12].map((house)=>[house,houseLord(d1,house)]));
-  const connected=(first,second)=>{
-    if(first===second) return true;
-    const firstHouse=bodyHouse(d1,first),secondHouse=bodyHouse(d1,second);
-    return firstHouse===secondHouse||structural.aspects.some((aspect)=>(aspect.body===first&&aspect.toHouse===secondHouse)||(aspect.body===second&&aspect.toHouse===firstHouse));
-  };
+  const connected=(first,second)=>planetsConnected(d1,structural,first,second);
   const supportiveHouses=new Set([1,2,4,5,7,9,10,11]);
   const strong=(planet)=>STRONG_DIGNITIES.has(structural.planets[planet]?.dignity)||structural.planets[planet]?.dignity==="Friendly sign";
   const sav=(house)=>structural.ashtakavarga.sav[rowByHouse(d1,house).sign];
@@ -497,11 +510,19 @@ function buildInheritanceAnalysis(result,structural,current){
   },0);
 
   const eighthLord=lords[8],eighthLordHouse=bodyHouse(d1,eighthLord);
+  const secondExchange=planetsExchange(d1,eighthLord,lords[2]);
+  const eleventhExchange=planetsExchange(d1,eighthLord,lords[11]);
+  const secondToEighth=planetLinksHouse(d1,structural,lords[2],8);
+  const eleventhToEighth=planetLinksHouse(d1,structural,lords[11],8);
+  const eighthToSecond=planetLinksHouse(d1,structural,eighthLord,2);
+  const eighthToEleventh=planetLinksHouse(d1,structural,eighthLord,11);
+  const wealthInheritanceLinks=[secondExchange,eleventhExchange,secondToEighth,eleventhToEighth,eighthToSecond,eighthToEleventh].filter(Boolean).length;
   let promisePoints=(rowByHouse(d1,8).bodies.length?1:0)+(strong(eighthLord)?2:0)+(supportiveHouses.has(eighthLordHouse)?1:0)+(sav(8)>=avAverage?1:0);
   if(connected(eighthLord,lords[2])) promisePoints+=2;
   if(connected(eighthLord,lords[11])) promisePoints+=2;
+  promisePoints+=Math.min(3,wealthInheritanceLinks);
 
-  let receiptPoints=(connected(eighthLord,lords[11])?3:0)+(connected(eighthLord,lords[2])?2:0)+(rowByHouse(d1,11).bodies.length?1:0)+(supportiveHouses.has(bodyHouse(d1,lords[11]))?1:0)+(sav(11)>=avAverage?1:0);
+  let receiptPoints=(connected(eighthLord,lords[11])?3:0)+(connected(eighthLord,lords[2])?2:0)+(eleventhToEighth||eighthToEleventh||eleventhExchange?2:0)+(secondToEighth||eighthToSecond||secondExchange?1:0)+(rowByHouse(d1,11).bodies.length?1:0)+(supportiveHouses.has(bodyHouse(d1,lords[11]))?1:0)+(sav(11)>=avAverage?1:0);
   let retentionPoints=(strong(lords[2])?2:0)+(supportiveHouses.has(bodyHouse(d1,lords[2]))?2:0)+(sav(2)>=avAverage?1:0)+(connected(lords[2],lords[11])?1:0);
   const leakageLinks=[connected(lords[2],lords[12]),connected(eighthLord,lords[12])].filter(Boolean).length;
   retentionPoints-=leakageLinks;
@@ -537,26 +558,23 @@ function buildInheritanceAnalysis(result,structural,current){
   const timingLevel=!current?"Low":axis.pair==="6/8"?"Low":axis.pair==="2/12"?"Moderate":activeControllers.length>=2?"Good":activeControllers.length?"Moderate":"Low";
 
   return {
-    promise:{level:level(promisePoints,7,3),detail:`D1 H8 and its lord establish availability; H2/H11 links determine whether inherited value can become retained wealth.`},
+    promise:{level:level(promisePoints,7,3),detail:`D1 H8 and its lord establish availability; H2/H11 links determine whether inherited value can become retained wealth. ${wealthInheritanceLinks} direct aspect, ownership or exchange link(s) join the inheritance and wealth houses.`},
     receipt:{level:level(receiptPoints,6,3),detail:`Realization is read from H8 to H11 and H2. H11 lord ${lords[11]} is in H${bodyHouse(d1,lords[11])}.`},
     retention:{level:level(retentionPoints,5,2),detail:`Retention is judged separately through H2, its lord and H12 leakage. ${leakageLinks} configured leakage link(s) are present.`},
     dispute:{level:disputeRisk,detail:`H6, H12, malefic pressure and their links to H8/property controllers produce ${disputeRisk.toLowerCase()} configured dispute friction.`},
     sources,assetTypes,lineageHouses,controllers:controllerGroups,
     timing:{level:timingLevel,mdLord:current?.mdLord||null,adLord:current?.adLord||null,axis:current?.geometry||null,axisAssessment:axis,activeControllers,detail:!current?"No current MD-AD period is available.":`${current.mdLord}-${current.adLord} activates ${activeControllers.length?activeControllers.join(" and "):"no direct inheritance controller"}. Material activation and ease are separate: ${axis.detail}`},
     nodeModifiers:structural.nodes.filter((node)=>[2,6,8,11,12].includes(node.house)).map((node)=>({node:node.node,house:node.house,sign:node.sign,controller:node.signDispositor,detail:`${node.node} is treated through ${node.signDispositor} and ${node.nakshatraLord}; it modifies the inheritance route but cannot promise an event alone.`})),
+    wealthInheritanceLinks:{count:wealthInheritanceLinks,secondExchange,eleventhExchange,secondToEighth,eleventhToEighth,eighthToSecond,eighthToEleventh},
     d60Reliability:d60Reliability(result),
-    methodNote:"This model deliberately separates promise, source, asset type, receipt, retention, dispute and timing. D12 is used only for the native's parents. SAV confirms house support; it does not replace lordship. D60 is excluded unless the birth-time stability audit passes.",
+    methodNote:"This model deliberately separates promise, source, asset type, receipt, retention, dispute and timing. D12 is used only for the native's parents. Direct aspects to H2/H8/H11 and sign exchanges are counted; SAV confirms house support but does not replace lordship. D60 is included only after a stable audit or an explicit verified-to-the-second birth-time declaration.",
   };
 }
 
 function buildSpouseInheritanceAnalysis(result,structural,current,marriageDomain,inheritance){
   const d1=result.charts.D1,d9=result.charts.D9,d4=result.charts.D4;
   const level=(points,good=5,moderate=2)=>points>=good?"Good":points>=moderate?"Moderate":"Low";
-  const connected=(first,second)=>{
-    if(first===second) return true;
-    const firstHouse=bodyHouse(d1,first),secondHouse=bodyHouse(d1,second);
-    return firstHouse===secondHouse||structural.aspects.some((aspect)=>(aspect.body===first&&aspect.toHouse===secondHouse)||(aspect.body===second&&aspect.toHouse===firstHouse));
-  };
+  const connected=(first,second)=>planetsConnected(d1,structural,first,second);
   const d1Lords={second:houseLord(d1,2),seventh:houseLord(d1,7),eighth:houseLord(d1,8),eleventh:houseLord(d1,11)};
   const d9Lords={seventh:houseLord(d9,7),spouseWealth:houseLord(d9,8),spouseInheritance:houseLord(d9,2)};
   const d9Support=(houses)=>houses.reduce((score,house)=>score+(rowByHouse(d9,house).bodies.length?1:0)+([1,4,5,7,9,10,11].includes(bodyHouse(d9,houseLord(d9,house)))?1:0),0);
@@ -582,6 +600,128 @@ function buildSpouseInheritanceAnalysis(result,structural,current,marriageDomain
     inheritedNativeContext:{promise:inheritance.promise.level,receipt:inheritance.receipt.level,retention:inheritance.retention.level},
     requiresSpouseChart:true,
     confidenceNote:"A native chart can show spouse-linked resources and household impact, but it cannot reliably identify or guarantee what the spouse personally inherits. Use the spouse's verified birth chart for that claim; the native's D12 must not be used for the spouse's parents.",
+  };
+}
+
+const DOMAIN_PLAIN_COPY=Object.freeze({
+  overview:{subject:"overall life direction",good:"The chart repeats several workable strengths, so the person is not dependent on one lucky placement.",moderate:"The chart has useful strengths, but they mature through choices, discipline and timing rather than running automatically.",low:"The chart does not justify a grand all-round claim; progress is more likely through a few carefully developed strengths."},
+  money:{subject:"earning and keeping money",good:"This is one of the chart's clearer practical capacities: earning, organizing and growing resources has repeated support.",moderate:"There is real money-making capacity, but accumulation and retention need structure; income alone should not be confused with lasting wealth.",low:"The chart calls for conservative money expectations and strong real-world financial habits rather than relying on a promised windfall."},
+  career:{subject:"work and professional standing",good:"The professional engine is genuinely supported: responsibility, skill and visible output can compound into status.",moderate:"Career can develop well, but the route is conditional and may require more deliberate specialization or course correction.",low:"Professional progress is more likely to come from patient skill-building than from quick recognition or an effortless rise."},
+  fame:{subject:"recognition and authority",good:"The chart can make the person's work noticeable when substance and consistency are already present.",moderate:"Recognition is available in selected settings, but it is not an automatic promise of fame or mass popularity.",low:"The chart is better used for meaningful work than for chasing visibility as an end in itself."},
+  marriage:{subject:"partnership and marriage",good:"There is a workable partnership promise with enough support for commitment and growth when both people participate maturely.",moderate:"Partnership is possible and meaningful, but harmony, durability and timing should be judged separately rather than romanticized.",low:"The chart asks for realism, communication and careful partner choice; it does not justify a guaranteed relationship outcome."},
+  foreign:{subject:"foreign travel, work or settlement",good:"Distance from the birthplace can become a genuine avenue for growth, work or residence rather than remaining a passing idea.",moderate:"Foreign links are possible, but movement, professional benefit and stable settlement do not all carry the same strength.",low:"The chart does not support treating relocation as a cure-all; any move should be justified by practical opportunity."},
+  inheritance:{subject:"inheritance and shared family assets",good:"The chart contains a real route by which family or shared assets can reach the native, though receipt and retention still need separate confirmation.",moderate:"An inheritance or family-asset channel exists, but amount, source, timing and ease are conditional and should not be exaggerated.",low:"The chart does not justify expecting a major inheritance; any family asset should be treated as uncertain until legally and practically established."},
+  property:{subject:"property and residence",good:"Property and residence are constructive life themes, with repeated support for building a tangible base over time.",moderate:"Property is workable, but acquisition, location, financing and residential peace need to be judged as separate questions.",low:"The chart favors caution with property commitments and does not support assuming easy ownership or stable residence."},
+  vehicles:{subject:"vehicles and material comforts",good:"The chart can support useful comforts and conveyances when purchases remain proportionate and practical.",moderate:"Comforts and vehicles are attainable, but upkeep, timing and expense deserve as much attention as acquisition.",low:"Material comforts should be chosen conservatively; the chart does not justify status-driven spending."},
+  gains:{subject:"gains, networks and fulfillment",good:"The chart has a credible ability to convert effort and connections into gains, especially when the underlying work is strong.",moderate:"Gains can arrive, but networks and opportunities need active cultivation and may be uneven.",low:"The chart asks the person to build dependable value first rather than expecting contacts or sudden gains to carry the result."},
+});
+
+function buildLaymanNarrative(domain,current,specialized={}){
+  const promise=domain.dimensions.promise||domain.confirmation.label;
+  const levelKey=promise.toLowerCase();
+  const copy=DOMAIN_PLAIN_COPY[domain.key]||DOMAIN_PLAIN_COPY.overview;
+  const natal=domain.confirmation.components.filter((item)=>item.key!=="timing");
+  const strongest=[...natal].sort((a,b)=>b.score-a.score)[0];
+  const support=domain.evidence.find((item)=>item.tone==="support");
+  const caution=domain.evidence.find((item)=>item.tone==="caution");
+  const timing=domain.confirmation.components.find((item)=>item.key==="timing");
+  const headline=promise==="Good"?`${domain.label}: a genuine strength, not a guarantee`:promise==="Moderate"?`${domain.label}: useful potential with conditions`:`${domain.label}: keep the claim modest and practical`;
+  let strongestPoint=support?`${support.title}. ${support.detail}`:`${strongest?.label||"Natal structure"} is the strongest configured layer.`;
+  let watchFor=caution?`${caution.title}. ${caution.detail}`:"No single caution should be isolated; check the full structure and real-life facts.";
+  let howItMayShow=`In ordinary life, this concerns ${copy.subject}. The most constructive expression is steady, ethical development rather than waiting for one dramatic event.`;
+  if(domain.key==="inheritance"&&specialized.inheritance){
+    const bestAsset=[...specialized.inheritance.assetTypes].sort((a,b)=>({Good:3,Moderate:2,Low:1}[b.level]-{Good:3,Moderate:2,Low:1}[a.level]))[0];
+    strongestPoint=`The clearest configured asset route is ${bestAsset.label.toLowerCase()} (${bestAsset.level}). Receipt is ${specialized.inheritance.receipt.level} and retention is ${specialized.inheritance.retention.level}.`;
+    watchFor=`Dispute or delivery friction is ${specialized.inheritance.dispute.level.toLowerCase()}. A chart cannot establish ownership, entitlement or legal outcome.`;
+    howItMayShow="This can show as family property, shared capital, a business mantle or support arriving through relatives; it does not by itself describe the amount or prove that a transfer will occur.";
+  }
+  if(domain.key==="foreign"&&specialized.foreign){
+    strongestPoint=`Movement is ${specialized.foreign.movement.level.toLowerCase()} while a durable foreign base is ${specialized.foreign.base.level.toLowerCase()}; these are deliberately not merged into one claim.`;
+    watchFor="Travel, employment abroad and permanent settlement are different outcomes. Visa rules, finances, health, family and actual opportunities remain decisive.";
+  }
+  return {
+    headline,
+    summary:`${copy[levelKey]||copy.moderate} The label describes astrological support, not certainty or event probability.`,
+    strongestPoint,howItMayShow,watchFor,
+    conditions:"The promise is most believable when D1, the topic Varga, the relevant lords and real-life behavior point in the same direction.",
+    timingNow:current?`${current.mdLord}-${current.adLord} currently gives ${timing?.score>=68?"good":timing?.score>=45?"moderate":"low"} activation. The MD-AD axis can make delivery easier or harder even when the natal promise is strong.`:"No current MD-AD activation was available.",
+  };
+}
+
+const VARGA_ROLES=Object.freeze({D2:"money and resource style",D4:"property, residence and fortune",D9:"maturity, relationship and inner strength",D10:"profession and public work",D11:"gains and fulfilment",D16:"vehicles and comforts",D24:"learning and skill",D60:"fine karmic confirmation"});
+function nakshatraLordForLongitude(longitude){return DASHA_LORDS[Math.floor((((longitude%360)+360)%360)/(360/27))%9];}
+function buildMahadashaProfiles(result,structural,timeline,rankings){
+  const d1=result.charts.D1,d60Status=d60Reliability(result);
+  return Object.fromEntries(rankings.map((item)=>{
+    const placementSav=structural.ashtakavarga.sav[item.sign];
+    const ownedHouseSav=item.housesOwned.map((house)=>({house,sign:rowByHouse(d1,house).sign,sav:structural.ashtakavarga.sav[rowByHouse(d1,house).sign]}));
+    const bav=structural.ashtakavarga.bav[item.lord]||null;
+    const bavRows=bav?Object.entries(bav).map(([sign,points])=>({sign,points})).sort((a,b)=>b.points-a.points):[];
+    const vargas=Object.entries(VARGA_ROLES).map(([code,role])=>{
+      const chart=result.charts[code];
+      const house=chart?bodyHouse(chart,item.lord):null,sign=chart?bodySign(chart,item.lord):null;
+      return {code,role,house,sign,supportive:house?[1,4,5,7,9,10,11].includes(house):false,included:code!=="D60"||d60Status.reliable};
+    });
+    const strengths=[];const cautions=[];
+    if(item.functional.code==="FB") strengths.push(`${item.lord} has functional-benefic ownership for this Lagna.`);
+    if(STRONG_DIGNITIES.has(item.dignity)) strengths.push(`${item.lord} has ${item.dignity.toLowerCase()} dignity in D1.`);
+    if(item.kendra||item.trikona||item.upachaya) strengths.push(`Its D1 placement can develop through ${item.trikona?"trinal purpose":item.kendra?"angular visibility":"effort and repetition"}.`);
+    if(item.dispositorStrong) strengths.push(`Its dispositor ${item.dispositor} is able to support delivery.`);
+    const repeated=vargas.filter((row)=>row.included&&row.supportive).map((row)=>row.code);
+    if(repeated.length) strengths.push(`Supportive houses repeat in ${repeated.join(", ")}.`);
+    if(placementSav>=structural.ashtakavarga.average) strengths.push(`The D1 placement sign has SAV ${placementSav}, at or above the chart average ${structural.ashtakavarga.average.toFixed(1)}.`);
+    if(item.functional.code==="FM") cautions.push(`${item.lord} has functional-malefic ownership, so its constructive results usually arrive with duty, friction or trade-offs.`);
+    if(item.dignity==="Debilitated"&&!item.debilitation.cancelled) cautions.push("D1 debilitation requires support from dispositor, aspects and repeated Vargas.");
+    if(item.combustion.combust) cautions.push(`Combustion is a delivery modifier; ${item.combustion.mitigations.length?`contextual mitigation comes from ${item.combustion.mitigations.join(", ")}`:"no configured mitigation was found"}.`);
+    if(placementSav<structural.ashtakavarga.average) cautions.push(`The placement sign SAV ${placementSav} is below the chart average ${structural.ashtakavarga.average.toFixed(1)}, so manifestation may need more effort.`);
+    if(d60Status.reliable&&item.d60.rawNature==="Malefic") cautions.push(`Verified D60 gives a ${item.d60.name} (${item.d60.rawNature.toLowerCase()}) fine modifier; it cannot cancel stronger D1 evidence.`);
+    const node=structural.nodes.find((row)=>row.node===item.lord);
+    const nodeText=node?`${item.lord} is not judged as an ordinary planet: its result is routed through ${node.signDispositor} as sign lord and ${node.nakshatraLord} as nakshatra lord. `:"";
+    const special=item.lord==="Ketu"?"Ketu is not automatically destructive. It tends to simplify, detach, expose or specialize the matters it controls; the surrounding lords decide whether that clearing becomes loss, mastery or redirection. ":item.lord==="Venus"?"Venus can build relationships, comforts, agreements, art or material value, but only through its actual D1 ownership, placement and controllers in this chart. ":"";
+    const subperiods=timeline.periods.filter((period)=>period.mdLord===item.lord).map((period)=>({adLord:period.adLord,start:period.start,end:period.end,axis:period.geometry.pair,delivery:period.theme.delivery}));
+    return [item.lord,{
+      lord:item.lord,level:item.level,headline:`${item.lord} Mahadasha: ${item.themes.map((theme)=>theme.label.toLowerCase()).join(", ")} become the main development themes`,
+      plainSummary:`${special}${nodeText}In D1, ${item.lord} occupies H${item.house} ${item.sign}${item.housesOwned.length?` and owns ${item.housesOwned.map((house)=>`H${house}`).join(" and ")}`:""}. Its best results come through the repeated strengths shown below; its label is comparative, not a promise that every subperiod will be easy.`,
+      manifestations:`Most likely expression: ${item.themes.map((theme)=>theme.label.toLowerCase()).join(", ")}. The Antardasha lord and the MD-AD house axis decide which part becomes active and how smoothly it is delivered.`,
+      strengths:strengths.length?strengths:["No single standout strength was configured; use the combined chart context."],
+      cautions:cautions.length?cautions:["Do not turn a comparative Good label into a guaranteed event."],
+      d1:{house:item.house,sign:item.sign,housesOwned:item.housesOwned,dignity:item.dignity,functional:item.functional,dispositor:item.dispositor,combustion:item.combustion},
+      vargas,ashtakavarga:{placementSav,chartAverage:structural.ashtakavarga.average,ownedHouseSav,bavBest:bavRows.slice(0,3),bavWeakest:bavRows.slice(-3).reverse(),note:bav?"BAV is mainly a transit-support tool; this profile shows it as context, not as a standalone natal verdict.":"Classical BAV is not assigned to Rahu or Ketu in this implementation."},
+      d60:item.d60,d60Reliability:d60Status,subperiods,
+    }];
+  }));
+}
+
+function buildMahadashaTransition(result,structural,timeline,current,profiles){
+  if(!current) return null;
+  const currentRows=timeline.periods.filter((period)=>period.mdLord===current.mdLord);
+  const currentEnd=currentRows.at(-1)?.end;
+  const next=timeline.periods.find((period)=>period.mdLord!==current.mdLord&&(!currentEnd||period.start>=currentEnd));
+  if(!next) return null;
+  const continuity=nakshatraLordForLongitude(result.positions[next.mdLord].longitude)===current.mdLord;
+  const currentNode=structural.nodes.find((node)=>node.node===current.mdLord);
+  const ketuToVenus=current.mdLord==="Ketu"&&next.mdLord==="Venus";
+  const bridge=ketuToVenus
+    ? `This is better read as clearing followed by construction, not destruction followed by a miracle. Ketu works through ${currentNode?.signDispositor||"its sign lord"} and ${currentNode?.nakshatraLord||"its nakshatra lord"}; Venus then develops its own D1 houses and repeated Varga themes.${continuity?" Venus is in a Ketu-ruled nakshatra, so the next chapter carries forward unfinished material from the Ketu period instead of beginning from zero.":""}`
+    : `${current.mdLord} closes one set of priorities and ${next.mdLord} opens another. The transition is judged by both lords' D1 condition, their Varga repetition and the first Antardasha axes.`;
+  return {from:current.mdLord,to:next.mdLord,start:next.start,end:profiles[next.mdLord]?.subperiods.at(-1)?.end||next.end,continuity,
+    headline:`${current.mdLord} to ${next.mdLord}: a change of operating style`,
+    plainSummary:`${bridge} ${profiles[next.mdLord]?.plainSummary||""}`,
+    caution:"A Mahadasha change alters emphasis; it does not erase the natal chart, guarantee wealth, or make every Antardasha equally favorable."};
+}
+
+function buildLifeNarrative(overallPromises,domains,current,transition){
+  const good=overallPromises.rows.filter((row)=>row.promise==="Good").map((row)=>row.label);
+  const moderate=overallPromises.rows.filter((row)=>row.promise==="Moderate").map((row)=>row.label);
+  const low=overallPromises.rows.filter((row)=>row.promise==="Low").map((row)=>row.label);
+  const leading=good.length?good.slice(0,4):moderate.slice(0,4);
+  return {
+    headline:good.length?"A chart with several real strengths that still need intelligent timing":"A conditional chart whose best results grow through focus and maturity",
+    summary:`The clearest configured promises are ${leading.join(", ")||"selective rather than broad"}. ${good.length?"These deserve positive language because multiple independent layers support them, but they are still capacities rather than guaranteed events.":"The report therefore avoids exaggerated praise and focuses on what can be developed."}`,
+    bestAssets:good.length?`Strongest topics: ${good.join(", ")}.`:`Most workable topics: ${moderate.join(", ")||"no strong topic isolated"}.`,
+    developmentTask:low.length?`Topics needing the most realism: ${low.join(", ")}. Low means limited configured support, not doom.`:"No domain is marked Low, but every Good result still needs practical judgment.",
+    currentChapter:current?`${current.mdLord}-${current.adLord} is the current activation chapter. Its ${current.geometry.pair} axis governs delivery more strongly than a planet's isolated dignity in this software model.`:"No current MD-AD chapter is available.",
+    transition:transition?.plainSummary||"No next-Mahadasha transition is available in the displayed range.",
   };
 }
 
@@ -671,8 +811,12 @@ export function buildPredictionReport(result, asOf = new Date()) {
   inheritanceDomain.confirmation.score=Math.round(inheritanceDomain.confirmation.components.reduce((sum,item)=>sum+item.score*item.weight,0)/100);
   inheritanceDomain.confirmation.label=confirmationLabel(inheritanceDomain.confirmation.score);
   inheritanceDomain.dimensions={...inheritanceDomain.dimensions,promise:inheritanceAnalysis.promise.level,strength:inheritanceAnalysis.receipt.level,ease:inheritanceAnalysis.dispute.level==="Low"?"Good":inheritanceAnalysis.dispute.level==="Moderate"?"Moderate":"Low",stability:inheritanceAnalysis.retention.level};
+  Object.values(domains).forEach((domain)=>{domain.layman=buildLaymanNarrative(domain,current,{foreign:foreignAnalysis,inheritance:inheritanceAnalysis});});
   const overallPromises=buildOverallPromises(result,structural,domains);
   const mahadashaRankings=buildMahadashaRankings(result,structural,timeline);
+  const mahadashaProfiles=buildMahadashaProfiles(result,structural,timeline,mahadashaRankings);
+  const mahadashaTransition=buildMahadashaTransition(result,structural,timeline,current,mahadashaProfiles);
+  const lifeNarrative=buildLifeNarrative(overallPromises,domains,current,mahadashaTransition);
   return {
     generatedFor: isoDay(asOf),
     domains,
@@ -686,6 +830,9 @@ export function buildPredictionReport(result, asOf = new Date()) {
     spouseInheritanceAnalysis,
     overallPromises,
     mahadashaRankings,
+    mahadashaProfiles,
+    mahadashaTransition,
+    lifeNarrative,
     readingOrder: [
       "Start with D1 structural promise and functional house lords.",
       "Open the relevant domain Varga; repetition is stronger than one isolated indication.",

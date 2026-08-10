@@ -21,5 +21,10 @@ export async function calculateBirthTimeSensitivity(result, adapter = serverEphe
 export async function calculateFullChart(input, { includeSensitivity = true } = {}) {
   const result = await calculateChart(input || {}, serverEphemeris);
   if (includeSensitivity) result.birthTimeSensitivity = await calculateBirthTimeSensitivity(result);
+  const verifiedByUser = [true, "true", "on", "1", 1].includes(input?.d60Verified);
+  if (verifiedByUser) {
+    result.birthTimeSensitivity = result.birthTimeSensitivity || { level: "User-verified exact time", note: "No perturbation audit was run. D60 cannot override D1." };
+    result.birthTimeSensitivity.verifiedByUser = true;
+  }
   return { ...result, prediction: buildPredictionReport(result) };
 }

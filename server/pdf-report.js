@@ -77,7 +77,11 @@ function domainBlock(page, domain, x, top, width, height, fonts) {
   page.drawText(clean(domain.label), { x: x + 10, y: top - 17, font: fonts.serifBold, size: 13, color: grayscale(1) });
   page.drawText(clean(`${domain.varga} | ${domain.confirmation.label}`), { x: x + 10, y: top - 31, font: fonts.bold, size: 7, color: grayscale(0.9) });
   let y = top - 53;
-  y = text(page, domain.description, x + 10, y, { font: fonts.regular, size: 7.6, color: MUTED, maxWidth: width - 20, lineHeight: 9.5 }) - 4;
+  const plain=domain.layman;
+  if(plain){
+    y=text(page,plain.headline,x+10,y,{font:fonts.bold,size:8.2,color:INK,maxWidth:width-20,lineHeight:10})-4;
+    y=text(page,plain.summary,x+10,y,{font:fonts.regular,size:7,color:MUTED,maxWidth:width-20,lineHeight:8.5})-5;
+  } else y = text(page, domain.description, x + 10, y, { font: fonts.regular, size: 7.6, color: MUTED, maxWidth: width - 20, lineHeight: 9.5 }) - 4;
   domain.confirmation.components.forEach((item) => {
     const level = item.score >= 68 ? "Good" : item.score >= 45 ? "Moderate" : "Low";
     page.drawText(clean(item.label), { x: x + 10, y, font: fonts.bold, size: 7.2, color: INK });
@@ -85,10 +89,10 @@ function domainBlock(page, domain, x, top, width, height, fonts) {
     y -= 11;
   });
   y -= 3;
-  y=text(page, domain.method || domain.confirmation.methodNote, x + 10, y, { font: fonts.regular, size: 6.8, color: MUTED, maxWidth: width - 20, lineHeight: 8.5 })-8;
+  y=text(page, plain?.howItMayShow || domain.method || domain.confirmation.methodNote, x + 10, y, { font: fonts.regular, size: 6.8, color: MUTED, maxWidth: width - 20, lineHeight: 8.5 })-8;
   if(height>=250){
-    page.drawText("KEY EVIDENCE",{x:x+10,y,font:fonts.bold,size:6.5,color:INK});y-=10;
-    domain.evidence.slice(0,4).forEach((item)=>{y=text(page,`${item.tone==="caution"?"Caution":"Support"}: ${item.title}. ${item.detail}`,x+10,y,{font:fonts.regular,size:6.3,color:MUTED,maxWidth:width-20,lineHeight:7.7})-4;});
+    page.drawText("BEST EVIDENCE AND CAUTION",{x:x+10,y,font:fonts.bold,size:6.5,color:INK});y-=10;
+    [plain?.strongestPoint,plain?.watchFor].filter(Boolean).forEach((line)=>{y=text(page,line,x+10,y,{font:fonts.regular,size:6.3,color:MUTED,maxWidth:width-20,lineHeight:7.7})-4;});
   }
 }
 
@@ -152,17 +156,17 @@ export async function buildLifeReportPdf(result, { locationName = "Birthplace" }
   y = text(page, `${result.local} | UTC ${result.utc} | ${result.location.latitude.toFixed(5)}, ${result.location.longitude.toFixed(5)}`, MARGIN, y, { font: fonts.regular, size: 9, color: MUTED, maxWidth: 510 }) - 28;
   text(page, `Rasi Lagna: ${result.charts.D1.ascSign}`, MARGIN, y, { font: fonts.bold, size: 12 });
   text(page, `Moon Nakshatra: ${result.panchanga.birthNakshatra.name}, Pada ${result.panchanga.birthNakshatra.pada}, Lord ${result.panchanga.birthNakshatra.lord}`, MARGIN, y - 24, { font: fonts.regular, size: 10 });
-  text(page, `Birth-time audit: ${result.birthTimeSensitivity?.level || "Not calculated"}`, MARGIN, y - 45, { font: fonts.regular, size: 10 });
+  text(page, `Birth-time audit: ${result.birthTimeSensitivity?.verifiedByUser ? "Verified to the second by user - D60 fine confirmation enabled" : result.birthTimeSensitivity?.level || "Not calculated"}`, MARGIN, y - 45, { font: fonts.regular, size: 10 });
   page.drawRectangle({ x: MARGIN, y: 88, width: 511, height: 102, color: grayscale(1), borderColor: grayscale(0.35), borderWidth: 1 });
   page.drawText("BETA TESTING - INTERPRETIVE ASTROLOGY ONLY", { x: MARGIN + 15, y: 163, font: fonts.bold, size: 10, color: INK });
   text(page, "This hobby report can be incomplete or inaccurate. It does not predict real-life events with certainty and is not medical, legal, financial, safety, relationship, career or other professional advice. Do not make important decisions from it.", MARGIN + 15, 143, { font: fonts.regular, size: 8.5, color: MUTED, maxWidth: 481, lineHeight: 12 });
 
   page = add(); header(page, "Index and evaluation order", "Report navigation", fonts);
   const indexRows = [
-    ["Birth record and disclaimer",1],["Index and evaluation order",2],["Exact degrees and Panchanga",3],["D1, D2, D3 and D4 charts",4],["D5, D9, D10 and D11 charts",5],["D12, D16, D24 and D60 charts",6],["Overall promises",7],["Money and career",8],["Marriage and foreign themes",9],["Property, vehicles and gains",10],["Astrological vitality cautions",11],["MD-AD timeline",12],["Sources, limits and terminology",13],
+    ["Birth record and disclaimer",1],["Index and evaluation order",2],["Exact degrees and Panchanga",3],["D1, D2, D3 and D4 charts",4],["D5, D9, D10 and D11 charts",5],["D12, D16, D24 and D60 charts",6],["Overall promises",7],["Money and career",8],["Marriage and foreign themes",9],["Property and inheritance",10],["Vehicles and gains",11],["Astrological vitality cautions",12],["MD-AD timeline",13],["Sources, limits and terminology",14],
   ];
-  rowsTable(page, indexRows.map(([name,pageNumber])=>({name,pageNumber})), [{label:"Section",width:.84,value:"name",bold:true},{label:"Page",width:.16,value:"pageNumber"}], 724, fonts, {rowHeight:29,fontSize:8.5});
-  let methodY=section(page,"Evaluation order",316,fonts);
+  const indexTableY=rowsTable(page, indexRows.map(([name,pageNumber])=>({name,pageNumber})), [{label:"Section",width:.84,value:"name",bold:true},{label:"Page",width:.16,value:"pageNumber"}], 724, fonts, {rowHeight:24,fontSize:8.2});
+  let methodY=section(page,"Evaluation order",indexTableY-16,fonts);
   ["1. D1 establishes natal promise and carries the highest interpretive priority.","2. Functional lordship, dignity, dispositors, aspects, conjunctions and configured yogas modify delivery.","3. The topic-specific divisional chart confirms; it does not manufacture an absent D1 promise.","4. BAV/SAV describes support for manifestation and timing context, never a verdict by itself.","5. MD is the environment and AD is the executor. Their ownership, placement, relationship and repetitions define timing themes.","6. D60 is a fine confirmation layer only when birth time is sufficiently accurate."].forEach((line)=>{methodY=text(page,line,MARGIN,methodY,{font:fonts.regular,size:8.4,maxWidth:511,lineHeight:11})-6;});
 
   page = add(); header(page,"Exact degrees and Panchanga","Astronomical record",fonts);
@@ -188,17 +192,20 @@ export async function buildLifeReportPdf(result, { locationName = "Birthplace" }
   page.drawText(clean(`Structural picture: ${promises.overall}`),{x:MARGIN+12,y:702,font:fonts.serifBold,size:16,color:grayscale(1)});
   page.drawText(clean(`${promises.counts.Good} Good | ${promises.counts.Moderate} Moderate | ${promises.counts.Low} Low domains`),{x:MARGIN+300,y:703,font:fonts.bold,size:8,color:grayscale(.9)});
   const promiseRows=promises.rows.map((row)=>({domain:row.label,varga:row.varga,promise:row.promise,layers:row.layers.map((layer)=>`${layer.key}:${layer.level}`).join(" | ")}));
-  let promiseY=rowsTable(page,promiseRows,[{label:"Domain",width:.22,value:"domain",bold:true},{label:"Varga",width:.12,value:"varga"},{label:"Promise",width:.14,value:"promise",bold:true},{label:"Evidence layers",width:.52,value:"layers"}],664,fonts,{rowHeight:32,fontSize:7.2});
-  promiseY=section(page,"Interpretive rule",promiseY-10,fonts);
-  text(page,"These labels describe stored astrological structure before timing. Supporting and contradictory evidence remain visible; no domain rating is a certainty statement or a probability of an event.",MARGIN,promiseY,{font:fonts.regular,size:8.5,color:MUTED,maxWidth:511,lineHeight:12});
+  let promiseY=rowsTable(page,promiseRows,[{label:"Domain",width:.22,value:"domain",bold:true},{label:"Varga",width:.12,value:"varga"},{label:"Promise",width:.14,value:"promise",bold:true},{label:"Evidence layers",width:.52,value:"layers"}],664,fonts,{rowHeight:29,fontSize:7.2});
+  promiseY=section(page,"The chart in ordinary language",promiseY-8,fonts);
+  promiseY=text(page,result.prediction.lifeNarrative.summary,MARGIN,promiseY,{font:fonts.regular,size:8,color:INK,maxWidth:511,lineHeight:10.5})-7;
+  promiseY=text(page,result.prediction.lifeNarrative.bestAssets,MARGIN,promiseY,{font:fonts.bold,size:7.6,color:INK,maxWidth:511,lineHeight:10})-6;
+  text(page,result.prediction.lifeNarrative.developmentTask,MARGIN,promiseY,{font:fonts.regular,size:7.5,color:MUTED,maxWidth:511,lineHeight:10});
 
-  const pairedPages=[["Money and career","Economic and professional themes",["money","career"]],["Marriage and foreign themes","Partnership and distance",["marriage","foreign"]],["Property, vehicles and gains","Material manifestation",["property","vehicles","gains"]]];
+  const pairedPages=[["Money and career","Economic and professional themes",["money","career"]],["Marriage and foreign themes","Partnership and distance",["marriage","foreign"]],["Property and inheritance","Assets, lineage and retention",["property","inheritance"]],["Vehicles and gains","Material support and fulfilment",["vehicles","gains"]]];
   pairedPages.forEach(([title,kicker,keys],pageIndex)=>{
     page=add();header(page,title,kicker,fonts);
     const domains=keys.map((key)=>result.prediction.domains[key]);
     if(domains.length===2){domainBlock(page,domains[0],MARGIN,724,511,292,fonts);domainBlock(page,domains[1],MARGIN,408,511,292,fonts);}
     else {domainBlock(page,domains[0],MARGIN,724,511,190,fonts);domainBlock(page,domains[1],MARGIN,516,511,190,fonts);domainBlock(page,domains[2],MARGIN,308,511,190,fonts);}
     if(pageIndex===0) text(page,"Money prioritizes the D1 H2/H11 carrier and Hora suitability. Career prioritizes D1 work/status structure and D10 Lagna, H6, H9, H10 and H11.",MARGIN,73,{font:fonts.regular,size:7.5,color:MUTED,maxWidth:511,lineHeight:9});
+    if(pageIndex===2) text(page,"Inheritance separates promise, source, asset type, receipt, retention and dispute. A chart never establishes legal ownership or entitlement.",MARGIN,73,{font:fonts.regular,size:7.5,color:MUTED,maxWidth:511,lineHeight:9});
   });
 
   page=add();header(page,"Astrological vitality cautions","Not a health diagnosis",fonts);
@@ -216,14 +223,20 @@ export async function buildLifeReportPdf(result, { locationName = "Birthplace" }
   const current=result.prediction.currentPeriod;
   const next=result.prediction.timeline.periods.filter((period)=>period.theme.phase==="upcoming").slice(0,3);
   const periods=[...(current?[current]:[]),...next];
+  const transition=result.prediction.mahadashaTransition;
   let periodY=724;
+  if(transition){
+    page.drawText(clean(transition.headline),{x:MARGIN,y:periodY,font:fonts.serifBold,size:12,color:INK});
+    text(page,transition.plainSummary,MARGIN,periodY-17,{font:fonts.regular,size:6.8,color:MUTED,maxWidth:511,lineHeight:8.2});
+    periodY=650;
+  }
   periods.forEach((period,index)=>{
-    page.drawRectangle({x:MARGIN,y:periodY-126,width:511,height:116,borderColor:LINE,borderWidth:.8,color:index===0&&period.current?grayscale(.94):grayscale(1)});
+    page.drawRectangle({x:MARGIN,y:periodY-108,width:511,height:100,borderColor:LINE,borderWidth:.8,color:index===0&&period.current?grayscale(.94):grayscale(1)});
     page.drawText(clean(index===0&&period.current?"CURRENT PERIOD":`NEXT WINDOW ${index+(current?0:1)}`),{x:MARGIN+12,y:periodY-28,font:fonts.bold,size:7,color:MUTED});
     page.drawText(clean(`${period.mdLord}-${period.adLord} | ${period.theme.delivery}`),{x:MARGIN+12,y:periodY-49,font:fonts.serifBold,size:14,color:INK});
     page.drawText(clean(`${period.start} to ${period.end} | ${period.geometry.relation}`),{x:MARGIN+265,y:periodY-47,font:fonts.bold,size:7.5,color:INK});
-    text(page,period.theme.summary,MARGIN+12,periodY-67,{font:fonts.regular,size:7.2,color:MUTED,maxWidth:487,lineHeight:9});
-    periodY-=137;
+    text(page,period.theme.summary,MARGIN+12,periodY-67,{font:fonts.regular,size:6.8,color:MUTED,maxWidth:487,lineHeight:8});
+    periodY-=116;
   });
   const best=result.prediction.mahadashaRankings.slice(0,5).map((item)=>`${item.lord} (${item.level})`).join(" | ");
   section(page,"Comparative Mahadasha delivery",159,fonts);text(page,best,MARGIN,133,{font:fonts.bold,size:8.5,maxWidth:511,lineHeight:11});
