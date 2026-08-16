@@ -5,6 +5,14 @@ the existing Python/FastAPI application in the parent directory.
 
 ## Calculation profile
 
+The interface now keeps three named calculation standards separate:
+
+- **BPHS / Parāśari (primary):** Lahiri sidereal positions, mean nodes, whole-sign houses in D1 and every Varga. This profile alone supplies the main promise grade.
+- **Classical KP (independent):** Krishnamurti ayanāṃśa, mean nodes and exact Placidus cusps. Natal and timing checks are displayed separately and never overwrite the Parāśari grade.
+- **JHora screenshot-compatible (comparison):** equal houses centred on the Ascendant and an ayanāṃśa calibrated to the supplied 26 August 2003, 05:53:55 Amritsar reference. The exact reference reproduces 23°53′32.19″ and the supplied Mahadasha boundaries. Other dates are explicitly labelled calibrated comparisons because the JHora ayanāṃśa option name is not known.
+
+The systems are never silently averaged. A disagreement remains visible for the reader to inspect.
+
 - Swiss Ephemeris compiled to WebAssembly (`@swisseph/browser`)
 - Built-in Moshier ephemeris, matching `pyswisseph` for the supported planets
 - Lahiri sidereal mode
@@ -51,10 +59,10 @@ import { BrowserSwissEphemerisAdapter } from "./src/swisseph-adapter.js";
 const ephemeris = await new BrowserSwissEphemerisAdapter().init();
 const result = await calculateChart({
   date: "2003-08-26",
-  time: "05:53:34",
+  time: "05:53:55",
   utcOffset: "+05:30",
-  latitude: 31.634,
-  longitude: 74.8723,
+  latitude: 31.6166667,
+  longitude: 74.85,
 }, ephemeris);
 ```
 

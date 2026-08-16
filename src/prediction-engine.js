@@ -1,5 +1,6 @@
 import { SIGNS, shashtiamsaAmsha } from "./varga-engine.js";
 import { buildStructuralAnalysis } from "./analysis-engine.js";
+import { addKPTiming } from "./kp-engine.js";
 
 export const PLANET_RULERS = Object.freeze({
   Aries: "Mars", Taurus: "Venus", Gemini: "Mercury", Cancer: "Moon",
@@ -57,6 +58,38 @@ function confirmationLabel(score) {
   if (score >= 68) return "Good";
   if (score >= 45) return "Moderate";
   return "Low";
+}
+
+export function synthesizeVedicKP(vedicLevel, kpLevel) {
+  if (!kpLevel) return {level:vedicLevel,agreement:"Vedic only",detail:"KP cusp data is unavailable, so no cross-system confirmation is claimed."};
+  const rank={Low:0,Moderate:1,Good:2};
+  const gap=Math.abs((rank[vedicLevel]??0)-(rank[kpLevel]??0));
+  const agreement=gap===0?"Aligned":gap===1?"Partial agreement":"Contradiction";
+  let level=vedicLevel;
+  if(vedicLevel==="Good"&&kpLevel==="Low") level="Moderate";
+  if(vedicLevel==="Moderate"&&kpLevel==="Low") level="Low";
+  // KP confirms or tempers delivery; it never promotes an absent D1-led promise.
+  if(vedicLevel==="Low") level="Low";
+  const detail=agreement==="Aligned"
+    ? `Both systems independently return ${level.toLowerCase()} support.`
+    : agreement==="Partial agreement"
+      ? `The systems are adjacent rather than identical; the D1-led Vedic promise remains primary and KP supplies a delivery check.`
+      : `Vedic and KP disagree materially. The result is reduced rather than averaging the contradiction away.`;
+  return {level,agreement,detail,vedic:vedicLevel,kp:kpLevel};
+}
+
+function buildVedicKPSynthesis(domain,kpDomain){
+  if(!kpDomain) return null;
+  const natal=domain.confirmation.components.filter((item)=>item.key!=="timing");
+  const natalWeight=natal.reduce((sum,item)=>sum+item.weight,0);
+  const natalScore=natal.reduce((sum,item)=>sum+item.score*item.weight,0)/natalWeight;
+  const vedicNatal=confirmationLabel(natalScore);
+  const vedicTiming=confirmationLabel(domain.confirmation.components.find((item)=>item.key==="timing")?.score||0);
+  return {
+    natal:synthesizeVedicKP(vedicNatal,kpDomain.level),
+    timing:synthesizeVedicKP(vedicTiming,kpDomain.timing?.level),
+    method:"D1-led Vedic promise sets the ceiling. KP cusp/sub-lord evidence may confirm or temper delivery, but cannot create a promise absent from D1.",
+  };
 }
 
 const STRONG_DIGNITIES=new Set(["Exalted","Moolatrikona","Own sign"]);
@@ -731,12 +764,13 @@ function buildOverallPromises(result, structural, domains) {
     const natal=domain.confirmation.components.filter((item)=>item.key!=="timing");
     const totalWeight=natal.reduce((sum,item)=>sum+item.weight,0);
     const natalScore=natal.reduce((sum,item)=>sum+item.score*item.weight,0)/totalWeight;
-    const promise=natalScore>=68?"Good":natalScore>=45?"Moderate":"Low";
+    const vedicPromise=natalScore>=68?"Good":natalScore>=45?"Moderate":"Low";
+    const promise=vedicPromise;
     const arudhaKey=arudhaMap[domain.key], arudha=structural.arudhas[arudhaKey];
     const nodes=structural.nodes.filter((node)=>domain.houses.includes(node.house)||domain.houses.includes(structural.planets[node.signDispositor]?.house));
     const support=domain.evidence.filter((item)=>item.tone==="support").slice(0,3);
     const cautions=domain.evidence.filter((item)=>item.tone==="caution").slice(0,2);
-    return {key:domain.key,label:domain.label,varga:domain.varga,promise,arudhaKey,arudha,nodes,support,cautions,
+    return {key:domain.key,label:domain.label,varga:domain.varga,promise,vedicPromise,arudhaKey,arudha,nodes,support,cautions,
       layers:natal.map((item)=>({key:item.key,label:item.label,level:item.score>=68?"Good":item.score>=45?"Moderate":"Low",detail:item.detail}))};
   });
   const counts={Good:rows.filter((row)=>row.promise==="Good").length,Moderate:rows.filter((row)=>row.promise==="Moderate").length,Low:rows.filter((row)=>row.promise==="Low").length};
@@ -756,6 +790,7 @@ function buildOverallPromises(result, structural, domains) {
       "The relevant divisional chart specializes the topic; independent repetition raises confidence.",
       "Arudha Lagna and topic Arudhas describe visible or material manifestation.",
       "Rahu and Ketu are interpreted through house, sign lord, nakshatra lord and cross-Varga reinforcement.",
+      "KP and JHora-compatible cusp results are displayed beside this profile for comparison only; neither changes the Parāśari promise grade.",
       "MD-AD, transits and current dates are deliberately excluded from this tab.",
     ],
     sources:["Master Rulebook V2 §§11-21 (hierarchy, AV, Arudha and Varga repetition)","Master Rulebook V2 §§42-46 (Trivedi-style nodal chain)","BPHS-derived dignity, lordship, Varga and yoga framework; paraphrased operationally"],
@@ -771,6 +806,8 @@ export function buildPredictionReport(result, asOf = new Date()) {
     return {...period,geometry,theme:periodTheme(result,structural,period,asOf,geometry)};
   });
   const current = timeline.periods.find((period) => period.current);
+  const kp=addKPTiming(result.kp,current);
+  const jhora=result.jhora;
   const domains = Object.fromEntries(Object.keys(DOMAIN_SPECS).map((key) => {
     const domain = evaluateDomain(result, key);
     const savValues = domain.houses.map((house) => {
@@ -811,6 +848,16 @@ export function buildPredictionReport(result, asOf = new Date()) {
   inheritanceDomain.confirmation.score=Math.round(inheritanceDomain.confirmation.components.reduce((sum,item)=>sum+item.score*item.weight,0)/100);
   inheritanceDomain.confirmation.label=confirmationLabel(inheritanceDomain.confirmation.score);
   inheritanceDomain.dimensions={...inheritanceDomain.dimensions,promise:inheritanceAnalysis.promise.level,strength:inheritanceAnalysis.receipt.level,ease:inheritanceAnalysis.dispute.level==="Low"?"Good":inheritanceAnalysis.dispute.level==="Moderate"?"Moderate":"Low",stability:inheritanceAnalysis.retention.level};
+  Object.entries(domains).forEach(([key,domain])=>{
+    domain.systemComparison={
+      parashari:domain.confirmation.label,
+      kpNatal:kp?.domains?.[key]?.level||null,
+      kpTiming:kp?.domains?.[key]?.timing?.level||null,
+      jhoraNatal:jhora?.domains?.[key]?.level||null,
+      combined:false,
+      note:"Independent frameworks are displayed side by side. No cross-system average or automatic downgrade is applied.",
+    };
+  });
   Object.values(domains).forEach((domain)=>{domain.layman=buildLaymanNarrative(domain,current,{foreign:foreignAnalysis,inheritance:inheritanceAnalysis});});
   const overallPromises=buildOverallPromises(result,structural,domains);
   const mahadashaRankings=buildMahadashaRankings(result,structural,timeline);
@@ -833,6 +880,9 @@ export function buildPredictionReport(result, asOf = new Date()) {
     mahadashaProfiles,
     mahadashaTransition,
     lifeNarrative,
+    kp,
+    jhora,
+    calculationProfiles:result.calculationProfiles||[],
     readingOrder: [
       "Start with D1 structural promise and functional house lords.",
       "Open the relevant domain Varga; repetition is stronger than one isolated indication.",

@@ -221,6 +221,9 @@ export async function calculateChart(input, ephemeris) {
     jd: astronomical.jd,
     location: { latitude, longitude, altitude:Number(input.altitude || 0) },
     panchanga,
+    kp: astronomical.kp || null,
+    jhora: astronomical.jhora || null,
+    lahiriAyanamsa: astronomical.lahiriAyanamsa,
     ...built,
   };
 }

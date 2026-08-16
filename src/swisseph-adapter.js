@@ -8,6 +8,7 @@ import {
 } from "@swisseph/browser";
 import bundledWasmUrl from "@swisseph/browser/dist/swisseph.wasm?url";
 import { normalizeLongitude } from "./varga-engine.js";
+import { JHORA_REFERENCE } from "./calculation-profiles.js";
 
 const PLANETS = Object.freeze({
   Sun: Planet.Sun,
@@ -19,6 +20,13 @@ const PLANETS = Object.freeze({
   Saturn: Planet.Saturn,
   Rahu: LunarPoint.MeanNode,
 });
+
+function shiftedPositions(positions, longitudeShift) {
+  return Object.fromEntries(Object.entries(positions).map(([name, position]) => [name, {
+    ...position,
+    longitude: normalizeLongitude(position.longitude + longitudeShift),
+  }]));
+}
 
 export class BrowserSwissEphemerisAdapter {
   constructor() {
@@ -60,6 +68,21 @@ export class BrowserSwissEphemerisAdapter {
       longitude: normalizeLongitude(houses.ascendant - ayanamsa),
       retrograde: false,
     };
-    return { jd, positions };
+    const jhoraAyanamsa = ayanamsa + JHORA_REFERENCE.lahiriOffset;
+    const jhoraPositions = shiftedPositions(positions, ayanamsa - jhoraAyanamsa);
+    const jhoraCusps = Array.from({ length: 12 }, (_, index) => normalizeLongitude(jhoraPositions.Asc.longitude + index * 30));
+    this.swe.setSiderealMode(SiderealMode.Krishnamurti);
+    const kpAyanamsa = this.swe.getAyanamsaExUt(jd, CalculationFlag.MoshierEphemeris);
+    const kpPositions = {};
+    for (const [name, body] of Object.entries(PLANETS)) {
+      const result = this.swe.calculatePosition(jd, body, flags);
+      kpPositions[name] = { longitude:normalizeLongitude(result.longitude), retrograde:result.longitudeSpeed < 0 };
+    }
+    kpPositions.Ketu = { longitude:normalizeLongitude(kpPositions.Rahu.longitude + 180), retrograde:true };
+    kpPositions.Asc = { longitude:normalizeLongitude(houses.ascendant - kpAyanamsa), retrograde:false };
+    const kp = { ayanamsa:kpAyanamsa, positions:kpPositions, cusps:houses.cusps.slice(1).map((cusp)=>normalizeLongitude(cusp-kpAyanamsa)) };
+    const jhora = { ayanamsa:jhoraAyanamsa, positions:jhoraPositions, cusps:jhoraCusps };
+    this.swe.setSiderealMode(SiderealMode.Lahiri);
+    return { jd, positions, kp, jhora, lahiriAyanamsa:ayanamsa };
   }
 }

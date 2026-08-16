@@ -1,6 +1,8 @@
 import { buildCharts, calculateChart, shashtiamsaAmsha } from "../src/varga-engine.js";
 import { buildPredictionReport } from "../src/prediction-engine.js";
 import { ServerSwissEphemerisAdapter } from "./ephemeris-adapter.js";
+import { buildKPAnalysis } from "../src/kp-engine.js";
+import { buildCalculationProfiles, matchesJHoraReference } from "../src/calculation-profiles.js";
 
 export const serverEphemeris = new ServerSwissEphemerisAdapter();
 
@@ -20,6 +22,27 @@ export async function calculateBirthTimeSensitivity(result, adapter = serverEphe
 
 export async function calculateFullChart(input, { includeSensitivity = true } = {}) {
   const result = await calculateChart(input || {}, serverEphemeris);
+  result.kp = buildKPAnalysis(result.kp, {
+    profileId:"kp",
+    system:"Classical KP · Krishnamurti ayanāṃśa · Placidus cusps",
+    houseSystem:"Placidus",
+  });
+  const referenceMatch = matchesJHoraReference(input);
+  result.jhora = buildKPAnalysis(result.jhora, {
+    profileId:"jhora",
+    system:referenceMatch ? "JHora supplied reference · equal cusps" : "JHora-calibrated comparison · equal cusps",
+    houseSystem:"Equal houses centred on the Ascendant",
+    methodNote:"This reproduces the supplied JHora-style star/sub and equal-house table independently. It is never blended into Classical KP or the primary Parāśari score.",
+    limitations:referenceMatch
+      ? "The supplied birth data and reference ayanāṃśa are matched. Ruling planets, transit and finer event judgment remain outside this natal comparison."
+      : "The ayanāṃśa uses an epoch-calibrated offset because the JHora option name was not supplied. It is a comparison profile, not a guaranteed JHora clone for other dates.",
+  });
+  result.calculationProfiles = buildCalculationProfiles({
+    lahiriAyanamsa:result.lahiriAyanamsa,
+    kpAyanamsa:result.kp?.ayanamsa,
+    jhoraAyanamsa:result.jhora?.ayanamsa,
+    referenceMatch,
+  });
   if (includeSensitivity) result.birthTimeSensitivity = await calculateBirthTimeSensitivity(result);
   const verifiedByUser = [true, "true", "on", "1", 1].includes(input?.d60Verified);
   if (verifiedByUser) {
