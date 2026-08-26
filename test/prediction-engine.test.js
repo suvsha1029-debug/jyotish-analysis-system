@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCharts } from "../src/varga-engine.js";
-import { CONFIRMATION_WEIGHTS, DOMAIN_SPECS, MD_AD_AXIS_WEIGHT, assessMdAdAxis, buildPredictionReport, evaluateDomain, synthesizeVedicKP, vimshottariTimeline } from "../src/prediction-engine.js";
+import { CONFIRMATION_WEIGHTS, DOMAIN_SPECS, MD_AD_AXIS_WEIGHT, assessMdAdAxis, buildPredictionReport, evaluateDomain, vimshottariTimeline } from "../src/prediction-engine.js";
 
 const longitudes = { Sun:128.47, Moon:106.84, Mars:311.84, Mercury:152.11, Jupiter:125.79, Venus:130.47, Saturn:76.15, Rahu:30.57, Ketu:210.57, Asc:125.84 };
 const positions = Object.fromEntries(Object.entries(longitudes).map(([name, longitude]) => [name, { longitude, retrograde:name === "Mars" }]));
@@ -8,12 +8,6 @@ const built = buildCharts(positions);
 const result = { ...built, utc:"2003-08-26T00:23:34.000Z" };
 
 describe("prediction domains", () => {
-  it("keeps D1-led Vedic promise primary while KP confirms or tempers it",()=>{
-    expect(synthesizeVedicKP("Good","Good")).toMatchObject({level:"Good",agreement:"Aligned"});
-    expect(synthesizeVedicKP("Good","Low")).toMatchObject({level:"Moderate",agreement:"Contradiction"});
-    expect(synthesizeVedicKP("Moderate","Low").level).toBe("Low");
-    expect(synthesizeVedicKP("Low","Good").level).toBe("Low");
-  });
   it("defines the practical rulebook domains", () => {
     expect(Object.keys(DOMAIN_SPECS)).toEqual(["overview","money","career","fame","marriage","foreign","inheritance","property","vehicles","gains"]);
   });

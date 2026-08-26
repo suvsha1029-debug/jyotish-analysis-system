@@ -15,15 +15,12 @@ describe("prediction workspace UI wiring",()=>{
     expect(source).toContain("data-open-spouse-inheritance");
     expect(source).toContain("data-open-marriage");
   });
-  it("exposes KP as a separate confirmation tab",()=>{
-    expect(source).toMatch(/function\s+renderKP\s*\(/);
-    expect(source).toContain('key:"kp",label:"KP confirmation"');
-    expect(source).toContain('key === "kp" ? renderKP()');
-  });
   it("shows auditable profiles and never labels a blended promise",()=>{
     expect(source).toMatch(/function\s+renderCalculationProfiles\s*\(/);
     expect(source).toContain('key:"profiles",label:"Calculation profiles"');
-    expect(source).toContain("No cross-system averaging");
+    expect(source).toContain("These columns are not averaged");
     expect(source).not.toContain("Synced promise");
+    expect(source).not.toContain('key:"kp",label:"KP confirmation"');
+    expect(source).toContain("KP disabled");
   });
 });

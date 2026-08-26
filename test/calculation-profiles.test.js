@@ -17,10 +17,11 @@ describe("separated calculation profiles",()=>{
     const result=await calculateFullChart(suppliedCase,{includeSensitivity:false});
     const profiles=Object.fromEntries(result.calculationProfiles.map((profile)=>[profile.id,profile]));
     expect(profiles.parashari.houses).toContain("Whole-sign");
-    expect(profiles.kp.houses).toContain("Placidus");
+    expect(profiles.kp).toBeUndefined();
     expect(profiles.jhora.referenceMatch).toBe(true);
     expect(profiles.jhora.ayanamsa.degrees).toBeCloseTo(JHORA_REFERENCE.ayanamsa,7);
     expect(result.jhora.houseSystem).toContain("Equal houses");
+    expect(result.kp).toBeNull();
     expect(result.jhora.cusps[0].longitude).toBeCloseTo(125.90949,4);
     expect(result.jhora.planets.Moon).toMatchObject({nakshatra:"Ashlesha",starLord:"Mercury",subLord:"Mercury"});
     expect(result.prediction.domains.overview.systemComparison.combined).toBe(false);

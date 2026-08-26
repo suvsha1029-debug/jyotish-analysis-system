@@ -5,13 +5,12 @@ the existing Python/FastAPI application in the parent directory.
 
 ## Calculation profile
 
-The interface now keeps three named calculation standards separate:
+The interface keeps the operational reading and its supplied reference audit separate:
 
 - **BPHS / Parāśari (primary):** Lahiri sidereal positions, mean nodes, whole-sign houses in D1 and every Varga. This profile alone supplies the main promise grade.
-- **Classical KP (independent):** Krishnamurti ayanāṃśa, mean nodes and exact Placidus cusps. Natal and timing checks are displayed separately and never overwrite the Parāśari grade.
 - **JHora screenshot-compatible (comparison):** equal houses centred on the Ascendant and an ayanāṃśa calibrated to the supplied 26 August 2003, 05:53:55 Amritsar reference. The exact reference reproduces 23°53′32.19″ and the supplied Mahadasha boundaries. Other dates are explicitly labelled calibrated comparisons because the JHora ayanāṃśa option name is not known.
 
-The systems are never silently averaged. A disagreement remains visible for the reader to inspect.
+KP is disabled in application reports and does not affect prediction wording, grades or PDFs. Its isolated source module is retained only for developer research and tests. The displayed profiles are never silently averaged.
 
 - Swiss Ephemeris compiled to WebAssembly (`@swisseph/browser`)
 - Built-in Moshier ephemeris, matching `pyswisseph` for the supported planets

@@ -25,7 +25,7 @@ export function matchesJHoraReference(input = {}) {
     && close(input.longitude, JHORA_REFERENCE.longitude, 0.0005);
 }
 
-export function buildCalculationProfiles({ lahiriAyanamsa, kpAyanamsa, jhoraAyanamsa, referenceMatch = false }) {
+export function buildCalculationProfiles({ lahiriAyanamsa, jhoraAyanamsa, referenceMatch = false }) {
   return [
     {
       id: "parashari",
@@ -39,17 +39,6 @@ export function buildCalculationProfiles({ lahiriAyanamsa, kpAyanamsa, jhoraAyan
       warning: "This profile alone supplies the main promise grades.",
     },
     {
-      id: "kp",
-      label: "Classical KP",
-      role: "Independent event-promise audit",
-      ayanamsa: { label: "Krishnamurti", degrees: kpAyanamsa },
-      houses: "Placidus cusps",
-      nodes: "Mean Rahu and Ketu",
-      dashaYear: "Displayed separately from the Parāśari timeline",
-      scoring: "Cusp sub-lord and significator routes are shown independently.",
-      warning: "KP never rewrites or silently lowers the Parāśari grade.",
-    },
-    {
       id: "jhora",
       label: "JHora screenshot-compatible",
       role: referenceMatch ? "Exact supplied reference case" : "Calibrated comparison",
@@ -57,7 +46,7 @@ export function buildCalculationProfiles({ lahiriAyanamsa, kpAyanamsa, jhoraAyan
       houses: "Equal houses centred on the Ascendant",
       nodes: "Mean Rahu and Ketu",
       dashaYear: `True sidereal solar year (${JHORA_REFERENCE.dashaYearDays} days)`,
-      scoring: "KP-style star/sub tables under the supplied JHora configuration.",
+      scoring: "JHora-style star/sub reference tables under the supplied configuration.",
       warning: referenceMatch
         ? "The birth data exactly matches the supplied JHora reference screen."
         : "Ayanāṃśa is a calibrated Lahiri offset because the JHora option name was not supplied; treat this as comparison, not an exact clone.",

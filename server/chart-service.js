@@ -22,24 +22,21 @@ export async function calculateBirthTimeSensitivity(result, adapter = serverEphe
 
 export async function calculateFullChart(input, { includeSensitivity = true } = {}) {
   const result = await calculateChart(input || {}, serverEphemeris);
-  result.kp = buildKPAnalysis(result.kp, {
-    profileId:"kp",
-    system:"Classical KP · Krishnamurti ayanāṃśa · Placidus cusps",
-    houseSystem:"Placidus",
-  });
+  // KP is deliberately not part of the application report. The isolated
+  // kp-engine module remains available only for developer research/tests.
+  result.kp = null;
   const referenceMatch = matchesJHoraReference(input);
   result.jhora = buildKPAnalysis(result.jhora, {
     profileId:"jhora",
     system:referenceMatch ? "JHora supplied reference · equal cusps" : "JHora-calibrated comparison · equal cusps",
     houseSystem:"Equal houses centred on the Ascendant",
-    methodNote:"This reproduces the supplied JHora-style star/sub and equal-house table independently. It is never blended into Classical KP or the primary Parāśari score.",
+    methodNote:"This reproduces the supplied JHora-style star/sub and equal-house table independently. It is never blended into the primary Parāśari score.",
     limitations:referenceMatch
       ? "The supplied birth data and reference ayanāṃśa are matched. Ruling planets, transit and finer event judgment remain outside this natal comparison."
       : "The ayanāṃśa uses an epoch-calibrated offset because the JHora option name was not supplied. It is a comparison profile, not a guaranteed JHora clone for other dates.",
   });
   result.calculationProfiles = buildCalculationProfiles({
     lahiriAyanamsa:result.lahiriAyanamsa,
-    kpAyanamsa:result.kp?.ayanamsa,
     jhoraAyanamsa:result.jhora?.ayanamsa,
     referenceMatch,
   });
